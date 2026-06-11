@@ -79,6 +79,7 @@
   <span class="badge b-offline" id="modelbadge">…</span>
   <select id="modelsel" onchange="switchModel(this.value)"></select>
   <select id="projsel" onchange="switchProject(this.value)"></select>
+  <button onclick="addProject()" title="Add a project folder the scanner did not find" style="padding:5px 10px;font-size:12px">+ folder</button>
   <span class="sub" id="statusline"></span>
 </header>
 <div class="tabs">
@@ -198,6 +199,14 @@ async function switchModel(m){
 async function switchProject(p){
   await fetch("/api/project",{method:"POST",body:JSON.stringify({project:p})});
   ACTIVE = p; refresh();
+}
+async function addProject(){
+  const p = prompt("Paste the FULL path to your project folder\n(it must contain a PROJECT_STATE.md):");
+  if(!p) return;
+  const res = await fetch("/api/add-project",{method:"POST",body:JSON.stringify({path:p})});
+  const r = await res.json();
+  if(r.error){ alert("Could not add project:\n\n" + r.error); return; }
+  ACTIVE = r.active; refresh();
 }
 function refresh(){ status(); loadBoard(); loadRoi(); loadHealth(); loadPop(); loadNext(); loadMemos(); loadLog(); loadTraces(); loadVision(); loadGallery(); }
 

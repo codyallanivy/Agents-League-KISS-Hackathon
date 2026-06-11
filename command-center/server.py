@@ -41,7 +41,31 @@ def discover_projects():
     return found
 
 
+REGISTRY = HERE / "projects.json"
+
+
+def load_registry():
+    """User-added project folders (manual 'find my project'), persisted."""
+    try:
+        saved = json.loads(REGISTRY.read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+    out = {}
+    for name, p in saved.items():
+        d = Path(p)
+        if d.is_dir() and (d / "PROJECT_STATE.md").exists():
+            out[name] = d
+    return out
+
+
+def save_registry():
+    manual = {n: str(p) for n, p in PROJECTS.items()
+              if ROOT not in p.resolve().parents}
+    REGISTRY.write_text(json.dumps(manual, indent=2), encoding="utf-8")
+
+
 PROJECTS = discover_projects()
+PROJECTS.update(load_registry())
 ACTIVE = "pizza-shop" if "pizza-shop" in PROJECTS else next(iter(PROJECTS))
 
 print("Booting KISS engine …")
@@ -317,7 +341,29 @@ class H(BaseHTTPRequestHandler):
         global ACTIVE
         n = int(self.headers.get("Content-Length", 0))
         data = json.loads(self.rfile.read(n) or b"{}")
-        if self.path == "/api/project":
+        if self.path == "/api/add-project":
+            d = Path(data.get("path", "").strip().strip('"'))
+            if not d.is_dir():
+                self._json({"error": "Folder not found: " + str(d)}, 400)
+            elif not (d / "PROJECT_STATE.md").exists():
+                mds = len(list(d.glob("*.md")))
+                self._json({"error": "No PROJECT_STATE.md in that folder ("
+                            + str(mds) + " other .md files found). Point at the folder "
+                            "containing your KISS files, or create PROJECT_STATE.md "
+                            "first - the studio needs a snapshot file to anchor on."}, 400)
+            else:
+                name = d.name
+                while name in PROJECTS and PROJECTS[name] != d:
+                    name += "_2"
+                PROJECTS[name] = d
+                save_registry()
+                for f in sorted(d.rglob("*.md")):
+                    CTX.foundry_iq._index_file(f)  # ground the new project's knowledge
+                ACTIVE = name
+                CTX.tracer.log(agent="CommandCenter", phase="add_project",
+                               output={"name": name, "path": str(d)})
+                self._json({"active": name, "projects": list(PROJECTS)})
+        elif self.path == "/api/project":
             name = data.get("project", "")
             if name in PROJECTS:
                 ACTIVE = name

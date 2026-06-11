@@ -284,8 +284,9 @@ function popScore(save=true){
   if(save) localStorage.setItem(key, JSON.stringify(store));
   const score = Math.round(sum/inputs.length);
   $("popn").textContent = score;
-  const v = score>=90?["Popsicle-perfect.","var(--good)"]:score>=75?["Strong — the human's better off.","var(--good)"]
-        :score>=50?["Decent — tighten the loop.","var(--warn)"]:["Be honest: is this worth the compute?","var(--bad)"];
+  // Dynamic Popsicle Index verdict bands (from DYNAMIC_POPSICLE_INDEX.md)
+  const v = score>=88?["Excellent — shipping, thrifty, verified.","var(--good)"]:score>=74?["Strong — the human's better off.","var(--good)"]
+        :score>=58?["Mixed — progress, but unverified work is dragging it.","var(--warn)"]:["Weak signal — be honest: is this worth the compute?","var(--bad)"];
   $("popv").textContent = v[0]; $("popv").style.color = v[1];
 }
 async function loadNext(){

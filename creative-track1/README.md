@@ -24,6 +24,10 @@ Outputs land in `output/<campaign>/`: KISS project files (PROJECT_STATE, PRODUCT
 
 The studio scaffolds the same KISS file set the Track 2 reasoning engine consumes — point `foundry-track2/main.py` at a campaign project and the Assessment Agent governs *its* scope too. Asset traces use the same JSONL schema as Track 2, queryable with the same query tool. Fabric IQ pattern: the asset tiers/quotas/rules in ASSET_POLICY.md are the same ontology-rule approach as `data/ontology.json`; Foundry IQ pattern: campaign content cites the survey-locked vision files.
 
+## D&D is one use case, not the product
+
+The studio is a general pattern: **any idea → KISS intake survey → governed project → generated understanding** (campaign, content plan, brand kit, lesson series). Modes adapt the survey — *project mode* for builders, *experience mode* for entertainment (this demo). A zero-AI **visual state engine** drives the look: your tone answer selects the palette for every asset, so the whole campaign feels art-directed for free.
+
 ## Demo art note
 
 Offline mode renders original SVG compositions (palette driven by your tone answer; the map legend encodes project state symbolically — shadowed regions = blockers, horizon = deadline). All content is original fantasy material; the policy explicitly blocks franchise IP and real-person likenesses.

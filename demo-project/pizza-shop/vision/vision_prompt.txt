@@ -1,0 +1,7 @@
+Concept art / vision board for the project "Pizza Shop Ordering App".
+Central image: the goal — MVP ordering flow (basic cart → checkout).
+Foreground (in warm light): the Tier 1 scope being built now: Menu display (items, prices, descriptions), Add to cart functionality, Order submission, Basic payment (Stripe).
+Shadowed regions at the edges: blockers — none currently.
+On distant islands across the water (visible but unreachable yet): parked ideas — none.
+A road from foreground to horizon marks progress: 3 steps laid, 10 remaining.
+Style: clean, hopeful, storybook-illustration; no text in the image; no real persons; original content only.

@@ -9,3 +9,5 @@
 - [ ] 2026-06-11 | portrait | portrait-4.svg | unreviewed
 - [ ] 2026-06-11 | map | map-1.svg | unreviewed
 - [ ] 2026-06-11 | title-card | title-card-1.svg | unreviewed
+- [ ] 2026-06-11 | vision-board | vision_board.svg | unreviewed
+- [ ] 2026-06-11 | vision-board | vision_board.svg | unreviewed

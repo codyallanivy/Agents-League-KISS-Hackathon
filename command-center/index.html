@@ -7,23 +7,27 @@
   :root { --bg:#0b0e14; --panel:#121826; --edge:#1f2a3d; --ink:#d7e0ee; --dim:#7b8aa3;
           --gold:#e9a13b; --good:#3ecf8e; --warn:#e9c46a; --bad:#e76f51; --acc:#5b8af5; }
   * { margin:0; padding:0; box-sizing:border-box; font-family:"Cascadia Code","Consolas",monospace; }
-  body { background:var(--bg); color:var(--ink); min-height:100vh; padding:18px; }
+  body { background:var(--bg) url('/assets/matrix-quill.png') no-repeat right -120px top -80px; background-size:480px; color:var(--ink); min-height:100vh; padding:18px; }
+  body::before { content:""; position:fixed; inset:0; background:linear-gradient(90deg, var(--bg) 55%, rgba(11,14,20,0.86)); pointer-events:none; }
+  header, .grid { position:relative; z-index:1; }
   header { display:flex; align-items:center; gap:14px; margin-bottom:16px; flex-wrap:wrap; }
+  header img.logo { width:42px; height:42px; border-radius:10px; }
   header h1 { font-size:19px; letter-spacing:3px; color:var(--gold); font-weight:600; }
   .badge { padding:4px 12px; border-radius:20px; font-size:12px; border:1px solid var(--edge); }
   .b-foundry { color:#7ab8ff; border-color:#7ab8ff; } .b-ollama { color:var(--good); border-color:var(--good); }
   .b-offline { color:var(--dim); border-color:var(--dim); }
   .sub { color:var(--dim); font-size:11.5px; }
+  select { background:#0e1420; border:1px solid var(--gold); color:var(--gold); border-radius:6px; padding:6px 10px; font-family:inherit; font-size:12.5px; }
   .grid { display:grid; grid-template-columns:1.25fr 1fr 1fr; gap:14px; }
   @media (max-width:1100px){ .grid{ grid-template-columns:1fr; } }
-  .panel { background:var(--panel); border:1px solid var(--edge); border-radius:10px; padding:14px; min-height:120px; }
+  .panel { background:var(--panel); border:1px solid var(--edge); border-radius:10px; padding:14px; min-height:110px; }
   .panel h2 { font-size:11px; letter-spacing:2.5px; color:var(--gold); margin-bottom:10px; text-transform:uppercase; }
   .col-span { grid-column:1 / -1; }
   input, button { background:#0e1420; border:1px solid var(--edge); color:var(--ink); border-radius:6px; padding:8px 10px; font-size:13px; font-family:inherit; }
   input { flex:1; } button { cursor:pointer; color:var(--gold); border-color:var(--gold); }
   button:hover { background:var(--gold); color:#0b0e14; }
   .row { display:flex; gap:8px; margin-bottom:10px; }
-  #chatlog, #scopelog { max-height:330px; overflow-y:auto; display:flex; flex-direction:column; gap:8px; }
+  #chatlog, #scopelog { max-height:300px; overflow-y:auto; display:flex; flex-direction:column; gap:8px; }
   .msg { padding:9px 11px; border-radius:8px; font-size:12.5px; line-height:1.55; white-space:pre-wrap; }
   .me { background:#1a2436; align-self:flex-end; max-width:85%; }
   .ai { background:#0e1726; border-left:3px solid var(--gold); max-width:95%; }
@@ -40,65 +44,104 @@
   .trace .a { color:var(--ink); display:block; margin-top:3px; }
   #visionwrap svg { width:100%; height:auto; border-radius:8px; }
   .hint { color:var(--dim); font-size:11px; font-style:italic; }
+  .pop-q { font-size:11.5px; color:var(--ink); margin:8px 0 3px; }
+  input[type=range] { width:100%; accent-color:var(--gold); padding:0; }
+  .pop-score { display:flex; align-items:baseline; gap:10px; border-top:1px solid var(--edge); margin-top:12px; padding-top:10px; }
+  .pop-score .n { font-size:30px; color:var(--gold); }
+  .roi-row { display:flex; justify-content:space-between; font-size:12px; padding:6px 8px; background:#0e1726; border-radius:5px; margin-bottom:5px; }
+  .roi-row .t { color:var(--acc); }
+  .hw { font-size:11.5px; padding:6px 9px; border-radius:5px; margin-bottom:5px; background:#241a12; border-left:3px solid var(--warn); }
+  .hok { font-size:11.5px; padding:6px 9px; border-radius:5px; background:#10231c; border-left:3px solid var(--good); }
 </style>
 </head>
 <body>
 <header>
+  <img class="logo" src="/assets/brand-logo.png" alt="DigitalQuill">
   <h1>⬡ KISS COMMAND CENTER</h1>
   <span class="badge b-offline" id="modelbadge">connecting…</span>
+  <select id="projsel" onchange="switchProject(this.value)"></select>
   <span class="sub" id="statusline">local-first · your files never leave this machine</span>
 </header>
 <div class="grid">
   <div class="panel">
     <h2>Ask the Engine</h2>
-    <div id="chatlog"><div class="msg ai">Ask anything grounded in your project files — "why was blockchain blocked?", "what does KISS-201 cover?", "who is at capacity risk?"</div></div>
+    <div id="chatlog"><div class="msg ai">Ask anything grounded in your project files — "why was blockchain blocked?", "what does KISS-201 cover?"</div></div>
     <div class="row" style="margin-top:10px"><input id="chatin" placeholder="ask the KISS coach…"><button onclick="send()">Send</button></div>
   </div>
   <div class="panel">
-    <h2>Scope Gate ✅⚠️🚫</h2>
+    <h2>Scope Gate ✅⚠️🚫 <span class="sub" id="scopeproj"></span></h2>
     <div class="row"><input id="scopein" placeholder='try: "add multiplayer pizza battles"'><button onclick="scope()">Check</button></div>
     <div id="scopelog"></div>
-    <p class="hint" style="margin-top:8px">Every check is the real Assessment Agent reading PRODUCT_VISION.md — and every verdict is parked or passed by rule R-4.</p>
+    <p class="hint" style="margin-top:8px">Real Assessment Agent, reading the active project's PRODUCT_VISION.md (rule R-4).</p>
   </div>
   <div class="panel">
-    <h2>The Board — pizza-shop</h2>
+    <h2>The Board <span class="sub" id="boardproj"></span></h2>
     <div id="board"></div>
+  </div>
+  <div class="panel">
+    <h2>Context Weight &amp; ROI <span class="sub">(cost BEFORE you spend)</span></h2>
+    <div id="roi"></div>
+    <div class="row" style="margin-top:8px"><span class="sub" style="align-self:center">$/1M input tokens:</span><input id="price" type="number" value="3" step="0.5" style="max-width:80px" oninput="loadRoi()"></div>
+    <p class="hint">Estimated cost to load each task type's minimum reading set — a planning tool, not an accountant.</p>
+  </div>
+  <div class="panel">
+    <h2>The Popsicle Test</h2>
+    <div id="pop"></div>
+    <div class="pop-score"><span class="n" id="popn">–</span><span id="popv" class="hint"></span></div>
+  </div>
+  <div class="panel">
+    <h2>Project Health</h2>
+    <div id="health"></div>
   </div>
   <div class="panel col-span">
     <h2>Reasoning Traces <span class="sub">(every prompt, every citation — queryable)</span></h2>
     <div class="row"><input id="tracein" placeholder="filter traces… (e.g. blockchain)"><button onclick="loadTraces()">Search</button></div>
-    <div id="traces"></div>
+    <div id="traces" style="max-height:320px;overflow-y:auto"></div>
   </div>
   <div class="panel col-span">
     <h2>Vision Board <span class="sub">(docs → visual understanding)</span></h2>
-    <div id="visionwrap"><p class="hint">run `python visualize.py ../demo-project/pizza-shop` to generate</p></div>
+    <div id="visionwrap"><p class="hint">run `python visualize.py &lt;project&gt;` to generate for the active project</p></div>
   </div>
 </div>
 <script>
 const $ = id => document.getElementById(id);
 const esc = s => (s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;");
+let ACTIVE = "";
+
+const POPQ = [
+  ["built",   "Is your idea actually shipping (not stuck half-finished)?"],
+  ["control", "Is the AI building WITH you — you in control, no rogue detours?"],
+  ["time",    "Is your time respected (no re-explaining every session)?"],
+  ["compute", "Is your compute well spent (value created vs tokens burned)?"],
+  ["proud",   "Would you be proud to ship what you have so far?"]];
 
 async function status(){
   const s = await (await fetch("/api/status")).json();
-  const b = $("modelbadge");
-  const tier = s.model.split(":")[0];
+  ACTIVE = s.active;
+  const b = $("modelbadge"), tier = s.model.split(":")[0];
   b.textContent = s.model.toUpperCase();
   b.className = "badge b-" + (tier === "foundry" ? "foundry" : tier === "ollama" ? "ollama" : "offline");
-  $("statusline").textContent = `${s.chunks} knowledge chunks indexed · trace: ${s.trace_file} · local-first`;
+  $("statusline").textContent = `${s.chunks} knowledge chunks · trace: ${s.trace_file} · local-first`;
+  $("projsel").innerHTML = s.projects.map(p => `<option ${p===s.active?"selected":""}>${p}</option>`).join("");
+  $("scopeproj").textContent = "· " + ACTIVE; $("boardproj").textContent = "· " + ACTIVE;
+}
+async function switchProject(p){
+  await fetch("/api/project",{method:"POST",body:JSON.stringify({project:p})});
+  ACTIVE = p; $("scopeproj").textContent = "· " + p; $("boardproj").textContent = "· " + p;
+  loadBoard(); loadRoi(); loadHealth(); loadVision(); loadPop(); loadTraces();
 }
 async function send(){
   const v = $("chatin").value.trim(); if(!v) return; $("chatin").value = "";
   $("chatlog").insertAdjacentHTML("beforeend", `<div class="msg me">${esc(v)}</div>`);
   const r = await (await fetch("/api/chat",{method:"POST",body:JSON.stringify({message:v})})).json();
-  $("chatlog").insertAdjacentHTML("beforeend",
-    `<div class="msg ai">${esc(r.answer)}<div class="cite">${esc((r.cites||[]).join(" · "))}</div></div>`);
+  $("chatlog").insertAdjacentHTML("beforeend", `<div class="msg ai">${esc(r.answer)}<div class="cite">${esc((r.cites||[]).join(" · "))}</div></div>`);
   $("chatlog").scrollTop = 1e9; loadTraces();
 }
 async function scope(){
   const v = $("scopein").value.trim(); if(!v) return;
   const r = await (await fetch("/api/scope",{method:"POST",body:JSON.stringify({request:v})})).json();
   $("scopelog").insertAdjacentHTML("afterbegin",
-    `<div class="msg ai"><span class="verdict ${r.verdict}">${r.verdict}</span> — Tier ${r.tier}\n${esc(r.answer)}<div class="cite">critic: ${r.critic} · ${esc((r.cites||[]).join(" · "))}</div></div>`);
+    `<div class="msg ai"><span class="verdict ${r.verdict}">${r.verdict}</span> — Tier ${r.tier} · ${esc(r.project)}\n${esc(r.answer)}<div class="cite">critic: ${r.critic}</div></div>`);
   loadTraces();
 }
 async function loadBoard(){
@@ -108,6 +151,35 @@ async function loadBoard(){
     `<div class="kcol blocked"><b>BLOCKED (${b.blocked.length})</b>${b.blocked.map(t=>`<div>${esc(t)}</div>`).join("")}</div>` +
     `<div class="kcol done"><b>DONE (${b.done.length})</b>${b.done.map(t=>`<div>${esc(t)}</div>`).join("")}</div>`;
 }
+async function loadRoi(){
+  const rows = await (await fetch("/api/roi")).json();
+  const price = parseFloat($("price").value) || 3;
+  $("roi").innerHTML = rows.map(r =>
+    `<div class="roi-row"><span class="t">${esc(r.set)}</span><span>${r.tokens.toLocaleString()} tok ≈ $${(r.tokens/1e6*price).toFixed(4)}/read</span></div>`).join("");
+}
+async function loadHealth(){
+  const h = await (await fetch("/api/health")).json();
+  $("health").innerHTML = h.ok ? `<div class="hok">✓ No bloat detected — snapshot, log, and WIP are within KISS limits.</div>`
+    : h.warnings.map(w => `<div class="hw">⚠ ${esc(w)}</div>`).join("");
+}
+function loadPop(){
+  const key = "kiss_pop_" + ACTIVE;
+  const saved = JSON.parse(localStorage.getItem(key) || "{}");
+  $("pop").innerHTML = POPQ.map(([k,q]) =>
+    `<div class="pop-q">${q}</div><input type="range" min="0" max="100" value="${saved[k] ?? 70}" data-k="${k}" oninput="popScore()">`).join("");
+  popScore();
+}
+function popScore(){
+  const key = "kiss_pop_" + ACTIVE, store = {};
+  let sum = 0, inputs = $("pop").querySelectorAll("input[data-k]");
+  inputs.forEach(i => { store[i.dataset.k] = +i.value; sum += +i.value; });
+  const score = Math.round(sum / inputs.length);
+  localStorage.setItem(key, JSON.stringify(store));
+  $("popn").textContent = score;
+  const v = score >= 90 ? ["Popsicle-perfect.","var(--good)"] : score >= 75 ? ["Strong — the human's better off.","var(--good)"]
+        : score >= 50 ? ["Decent — tighten the loop.","var(--warn)"] : ["Be honest: is this worth the compute?","var(--bad)"];
+  $("popv").textContent = v[0]; $("popv").style.color = v[1];
+}
 async function loadTraces(){
   const q = $("tracein").value.trim();
   const t = await (await fetch("/api/traces?q="+encodeURIComponent(q))).json();
@@ -116,12 +188,13 @@ async function loadTraces(){
 }
 async function loadVision(){
   const v = await (await fetch("/api/vision")).json();
-  if(v.svg) $("visionwrap").innerHTML = v.svg;
+  $("visionwrap").innerHTML = v.svg || '<p class="hint">run `python visualize.py` for this project to generate its vision board</p>';
 }
+["chatin","send"],["scopein","scope"],["tracein","loadTraces"];
 $("chatin").addEventListener("keydown", e=>{ if(e.key==="Enter") send(); });
 $("scopein").addEventListener("keydown", e=>{ if(e.key==="Enter") scope(); });
 $("tracein").addEventListener("keydown", e=>{ if(e.key==="Enter") loadTraces(); });
-status(); loadBoard(); loadTraces(); loadVision();
+(async()=>{ await status(); loadBoard(); loadRoi(); loadHealth(); loadPop(); loadTraces(); loadVision(); })();
 </script>
 </body>
 </html>

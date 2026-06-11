@@ -133,6 +133,8 @@ class BaseAgent:
         """Run via Foundry model if available, else deterministic offline logic.
         Either way the full step is traced."""
         user = self.grounded_prompt(task, grounding)
+        if self.ctx.model.mode != "offline":
+            print(f"  · {self.name} reasoning via {self.ctx.model.mode} …", flush=True)
         raw = self.ctx.model.complete(self.instructions, user)
         if raw is not None:
             result = {"answer": raw}

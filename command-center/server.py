@@ -364,6 +364,58 @@ def scaffold_kiss(d: Path):
     return created
 
 
+def browse(path_str):
+    """Server-side folder browser. Empty path = list drives (win) or / (posix)."""
+    import string
+    if not path_str:
+        if sys.platform == "win32":
+            drives = [d + ":\\" for d in string.ascii_uppercase
+                      if Path(d + ":\\").exists()]
+            return {"path": "", "parent": None,
+                    "dirs": [{"name": d, "kiss": False} for d in drives]}
+        path_str = "/"
+    p = Path(path_str)
+    if not p.is_dir():
+        return {"error": "not a folder: " + path_str}
+    dirs = []
+    try:
+        for d in sorted(p.iterdir()):
+            if d.is_dir() and not d.name.startswith((".", "$"))                     and d.name.lower() not in ("node_modules", "__pycache__"):
+                dirs.append({"name": d.name,
+                             "kiss": (d / "PROJECT_STATE.md").exists()})
+    except PermissionError:
+        return {"error": "permission denied: " + path_str}
+    parent = str(p.parent) if p.parent != p else ("" if sys.platform == "win32" else None)
+    return {"path": str(p), "parent": parent,
+            "is_kiss": (p / "PROJECT_STATE.md").exists(), "dirs": dirs[:200]}
+
+
+def board_to_ics():
+    """Export the active project's open + blocked tasks as calendar events
+    (.ics — opens in Outlook, Google, or Apple Calendar). Zero-auth bridge to
+    the calendar; live Graph sync is parked (D-H07/D-H10)."""
+    import datetime
+    b = board()
+    day = datetime.date.today() + datetime.timedelta(days=1)
+    lines = ["BEGIN:VCALENDAR", "VERSION:2.0",
+             "PRODID:-//KISS Studio//Command Center//EN"]
+    n = 0
+    for kind, items in (("TODO", b["now"]), ("BLOCKED", b["blocked"])):
+        for t in items:
+            d = day + datetime.timedelta(days=n // 3)  # ~3 tasks per day
+            title = (("[BLOCKED] " if kind == "BLOCKED" else "") + t.split("|")[0].strip())[:120]
+            lines += ["BEGIN:VEVENT",
+                      f"UID:kiss-{ACTIVE}-{n}@kiss.local",
+                      "DTSTAMP:" + time.strftime("%Y%m%dT%H%M%SZ", time.gmtime()),
+                      "DTSTART;VALUE=DATE:" + d.strftime("%Y%m%d"),
+                      "SUMMARY:" + title.replace(",", "\\,"),
+                      "DESCRIPTION:KISS project " + ACTIVE + " - from TODO.md",
+                      "END:VEVENT"]
+            n += 1
+    lines.append("END:VCALENDAR")
+    return "\r\n".join(lines)
+
+
 class H(BaseHTTPRequestHandler):
     def log_message(self, *a):
         pass
@@ -412,6 +464,17 @@ class H(BaseHTTPRequestHandler):
                         "chunks": len(CTX.foundry_iq.chunks),
                         "trace_file": CTX.tracer.path.name,
                         "projects": list(PROJECTS), "active": ACTIVE})
+        elif u.path == "/api/browse":
+            self._json(browse(qs.get("path", [""])[0]))
+        elif u.path == "/api/calendar.ics":
+            body = board_to_ics().encode()
+            self.send_response(200)
+            self.send_header("Content-Type", "text/calendar; charset=utf-8")
+            self.send_header("Content-Disposition",
+                             f'attachment; filename="kiss-{ACTIVE}.ics"')
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
         elif u.path == "/api/traces":
             self._json(traces(qs.get("q", [""])[0]))
         elif u.path == "/api/vision":

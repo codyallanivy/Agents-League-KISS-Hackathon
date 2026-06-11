@@ -115,7 +115,8 @@
       <div id="scopelog" style="max-height:240px;overflow-y:auto;display:flex;flex-direction:column;gap:8px"></div>
     </div>
     <div class="panel">
-      <h2>The Board <span class="sub">(click to check off)</span></h2>
+      <h2>The Board <span class="sub">(click to check off)</span>
+        <a href="/api/calendar.ics" style="float:right;color:var(--acc);font-size:10px;letter-spacing:1px;text-decoration:none" title="Export open tasks as calendar events (Outlook / Google / Apple)">📅 → CALENDAR</a></h2>
       <div id="board"></div>
     </div>
     <div class="panel">
@@ -171,6 +172,19 @@
   </div>
 </div>
 
+<div id="bmodal" style="display:none;position:fixed;inset:0;background:rgba(5,8,14,.8);z-index:50;align-items:center;justify-content:center">
+  <div style="background:var(--panel);border:1px solid var(--gold);border-radius:12px;width:520px;max-width:92vw;padding:16px">
+    <h2 style="font-size:12px;letter-spacing:2px;color:var(--gold);margin-bottom:8px">FIND YOUR PROJECT FOLDER</h2>
+    <div id="bpath" class="sub" style="margin-bottom:8px;word-break:break-all"></div>
+    <div id="blist" style="max-height:46vh;overflow-y:auto;margin-bottom:12px"></div>
+    <div class="row" style="margin:0">
+      <button id="bselect" onclick="pickFolder()">Use this folder</button>
+      <button onclick="$('bmodal').style.display='none'" style="color:var(--dim);border-color:var(--dim)">Cancel</button>
+    </div>
+    <p class="hint" style="margin-top:8px">⬡ = already a KISS project. Any other folder can be onboarded — your files are never modified.</p>
+  </div>
+</div>
+<style>.brow{padding:7px 10px;border-radius:6px;cursor:pointer;font-size:12.5px}.brow:hover{background:#1a2436}</style>
 <script>
 const $ = id => document.getElementById(id);
 const esc = s => (s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;");
@@ -181,9 +195,10 @@ function tab(v){
   document.querySelectorAll(".view").forEach(x=>x.classList.toggle("on", x.id===v));
   if(v==="v3"){ loadGallery(); loadVision(); }
 }
+async function safe(fn){ try{ await fn(); }catch(e){ console.warn(fn.name, e); } }
 async function status(){
   const s = await (await fetch("/api/status")).json();
-  ACTIVE = s.active;
+  ACTIVE = s.active; s.models = s.models || [s.model]; s.projects = s.projects || [];
   const b = $("modelbadge"), tier = s.model.split(":")[0];
   b.textContent = s.model.toUpperCase();
   b.className = "badge b-" + (tier==="foundry"?"foundry":tier==="ollama"?"ollama":"offline");
@@ -200,10 +215,28 @@ async function switchProject(p){
   await fetch("/api/project",{method:"POST",body:JSON.stringify({project:p})});
   ACTIVE = p; refresh();
 }
-async function addProject(){
-  const p = prompt("Paste the FULL path to your project folder\n(it must contain a PROJECT_STATE.md):");
-  if(!p) return;
-  const res = await fetch("/api/add-project",{method:"POST",body:JSON.stringify({path:p})});
+let BROWSE = "";
+async function addProject(){ openBrowser(""); }
+async function openBrowser(path){
+  const b = await (await fetch("/api/browse?path="+encodeURIComponent(path))).json();
+  if(b.error){ alert(b.error); return; }
+  BROWSE = b.path;
+  $("bpath").textContent = b.path || "Select a drive";
+  $("bselect").style.display = b.path ? "inline-block" : "none";
+  $("bselect").textContent = b.is_kiss ? "✓ Open this KISS project" : "Use this folder (onboard into KISS)";
+  let rows = "";
+  if(b.parent !== null && b.path) rows += `<div class="brow" onclick="openBrowser('${esc(b.parent).replace(/\\/g,"\\\\")}')">⬑ ..</div>`;
+  rows += b.dirs.map(d=>{
+    const sep = b.path.includes("/") && !b.path.includes("\\") ? "/" : "\\";
+    const full = b.path ? (b.path.endsWith(sep) ? b.path+d.name : b.path+sep+d.name) : d.name;
+    return `<div class="brow" onclick="openBrowser('${esc(full).replace(/\\/g,"\\\\")}')">${d.kiss?"⬡":"📁"} ${esc(d.name)}${d.kiss?' <span class="sub">KISS project</span>':""}</div>`;
+  }).join("");
+  $("blist").innerHTML = rows || '<p class="hint">no subfolders</p>';
+  $("bmodal").style.display = "flex";
+}
+async function pickFolder(){
+  $("bmodal").style.display = "none";
+  const res = await fetch("/api/add-project",{method:"POST",body:JSON.stringify({path:BROWSE})});
   const r = await res.json();
   if(r.offer_init){
     if(confirm(r.message + "\n\n(Creates PROJECT_STATE, TODO, DECISIONS, RISK_POLICY, PRODUCT_VISION, READ_FIRST, PENDING_VERIFICATION)")){
@@ -217,7 +250,7 @@ async function addProject(){
   if(r.error){ alert("Could not add project:\n\n" + r.error); return; }
   ACTIVE = r.active; refresh();
 }
-function refresh(){ status(); loadBoard(); loadRoi(); loadHealth(); loadPop(); loadNext(); loadMemos(); loadLog(); loadTraces(); loadVision(); loadGallery(); }
+function refresh(){ [status, loadBoard, loadRoi, loadHealth, loadPop, loadNext, loadMemos, loadLog, loadTraces, loadVision, loadGallery].forEach(f=>safe(f)); }
 
 async function ask(input, logdiv){
   const v = $(input).value.trim(); if(!v) return; $(input).value="";
@@ -331,7 +364,7 @@ $("heroin").addEventListener("keydown",e=>{if(e.key==="Enter")heroSend();});
 $("scopein").addEventListener("keydown",e=>{if(e.key==="Enter")scope();});
 $("tracein").addEventListener("keydown",e=>{if(e.key==="Enter")loadTraces();});
 $("memoin").addEventListener("keydown",e=>{if(e.key==="Enter")addMemo();});
-(async()=>{ await status(); refresh(); })();
+(async()=>{ await safe(status); refresh(); })();
 </script>
 </body>
 </html>

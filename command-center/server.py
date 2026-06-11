@@ -280,6 +280,90 @@ def chat(message):
     return {"answer": raw, "cites": [g["citation"] for g in grounding][:3]}
 
 
+KISS_TEMPLATES = {
+    "PROJECT_STATE.md": """# Project State — {name}
+
+> Source of truth for: the CURRENT snapshot of this project. Never a changelog — dated history belongs in ITERATION_LOG.md.
+
+**Sprint goal:** TBD — set your first sprint goal
+**Status:** onboarding | **Created:** {date} by KISS studio upgrade
+
+## Imported sources (pre-existing files, untouched)
+{imports}
+
+## Blockers
+- None yet
+""",
+    "TODO.md": """# To Do — {name}
+
+> Source of truth for: the real backlog. [ ] open · [x] done · [~] blocked.
+
+## Now
+- [ ] Review imported notes and set the sprint goal | light
+- [ ] Fill PRODUCT_VISION.md tiers (what's v1, what's parked) | medium
+
+## Later
+""",
+    "DECISIONS.md": """# Decisions — {name}
+
+> Source of truth for: locked decisions and parked requests. Format: D-XXX | date | what | why | revisit trigger.
+
+- **D-001** | {date} | Adopted KISS project memory (studio upgrade — existing files preserved, never deleted) | Why: durable agent memory + scope discipline | Revisit: never
+""",
+    "RISK_POLICY.md": """# Risk Policy — {name}
+
+> Source of truth for: what an AI agent may do alone vs. what needs the owner.
+
+- Tier 2/3 requests: capture in DECISIONS.md, don't build (default answer: "capture it, don't build it")
+- STOP and ask before: deleting files, changing scope, anything irreversible
+- Silence is never approval
+""",
+    "PRODUCT_VISION.md": """# Product Vision — {name}
+
+## Scope Split
+
+### In Scope for Tier 1 (build now)
+- (fill in: the smallest version worth shipping)
+
+### In Scope for Tier 2 (after Tier 1 ships)
+- (capture, don't build)
+
+### Out of Scope for Now
+- (be honest)
+""",
+    "READ_FIRST.md": """# Read First — {name}
+
+> Source of truth for: the MINIMUM files an agent must read per task type. Small tasks must not cost full-project context.
+
+| Task type | Read only |
+|---|---|
+| Small tweak | PROJECT_STATE.md |
+| Feature work | PROJECT_STATE.md, TODO.md, DECISIONS.md |
+| Architecture / scope call | all KISS files + PRODUCT_VISION.md |
+""",
+    "PENDING_VERIFICATION.md": """# Pending Verification — {name}
+
+> Source of truth for: built-but-not-tested work. At >8 open items, stop building and verify.
+""",
+}
+
+
+def scaffold_kiss(d: Path):
+    """Studio upgrade path: onboard an existing folder into KISS. Only creates
+    missing files; never modifies or deletes anything that exists."""
+    existing = sorted(f.name for f in d.glob("*.md"))[:12]
+    imports = "\n".join("- " + n for n in existing) or "- (none found)"
+    created = []
+    for fname, tpl in KISS_TEMPLATES.items():
+        target = d / fname
+        if not target.exists():
+            target.write_text(tpl.format(name=d.name, imports=imports,
+                                         date=time.strftime("%Y-%m-%d")),
+                              encoding="utf-8")
+            created.append(fname)
+    return created
+
+
 class H(BaseHTTPRequestHandler):
     def log_message(self, *a):
         pass
@@ -346,11 +430,14 @@ class H(BaseHTTPRequestHandler):
             if not d.is_dir():
                 self._json({"error": "Folder not found: " + str(d)}, 400)
             elif not (d / "PROJECT_STATE.md").exists():
-                mds = len(list(d.glob("*.md")))
-                self._json({"error": "No PROJECT_STATE.md in that folder ("
-                            + str(mds) + " other .md files found). Point at the folder "
-                            "containing your KISS files, or create PROJECT_STATE.md "
-                            "first - the studio needs a snapshot file to anchor on."}, 400)
+                mds = sorted(f.name for f in d.glob("*.md"))[:8]
+                self._json({"offer_init": True, "path": str(d),
+                            "found_md": mds,
+                            "message": "No KISS files here yet ("
+                            + (", ".join(mds) if mds else "no .md files")
+                            + " found). Initialize this folder as a KISS project? "
+                            "Existing files are preserved and listed as imported "
+                            "sources - nothing is modified or deleted."})
             else:
                 name = d.name
                 while name in PROJECTS and PROJECTS[name] != d:
@@ -363,6 +450,24 @@ class H(BaseHTTPRequestHandler):
                 CTX.tracer.log(agent="CommandCenter", phase="add_project",
                                output={"name": name, "path": str(d)})
                 self._json({"active": name, "projects": list(PROJECTS)})
+        elif self.path == "/api/init-project":
+            d = Path(data.get("path", "").strip().strip('"'))
+            if not d.is_dir():
+                self._json({"error": "Folder not found: " + str(d)}, 400)
+            else:
+                created = scaffold_kiss(d)
+                name = d.name
+                while name in PROJECTS and PROJECTS[name] != d:
+                    name += "_2"
+                PROJECTS[name] = d
+                save_registry()
+                for f in sorted(d.rglob("*.md")):
+                    CTX.foundry_iq._index_file(f)
+                ACTIVE = name
+                CTX.tracer.log(agent="CommandCenter", phase="init_project",
+                               output={"name": name, "created": created})
+                self._json({"active": name, "created": created,
+                            "projects": list(PROJECTS)})
         elif self.path == "/api/project":
             name = data.get("project", "")
             if name in PROJECTS:

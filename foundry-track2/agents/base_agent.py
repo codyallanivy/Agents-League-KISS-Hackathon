@@ -46,11 +46,49 @@ class ModelClient:
             except Exception as exc:  # missing SDK, no az login, quota, etc.
                 print(f"[warn] Foundry unavailable ({type(exc).__name__}: {exc}) — offline reasoning mode.")
 
+        # Tier 2: local open-weight model via Ollama (free, private, offline).
+        # See research: "Community Open Model Path" — local inference first.
+        self.ollama_model = os.getenv("OLLAMA_MODEL", "qwen2.5:7b")
+        self.ollama_url = os.getenv("OLLAMA_URL", "http://localhost:11434")
+        self._ollama = False
+        if not self._openai:
+            try:
+                import urllib.request
+                req = urllib.request.urlopen(self.ollama_url + "/api/tags", timeout=1.5)
+                tags = json.loads(req.read().decode())
+                names = [m.get("name", "") for m in tags.get("models", [])]
+                if names:
+                    if not any(self.ollama_model in n for n in names):
+                        self.ollama_model = names[0]
+                    self._ollama = True
+            except Exception:
+                pass  # no local model server — deterministic tier
+
     @property
     def mode(self):
-        return f"foundry:{self.deployment}" if self._openai else "offline"
+        if self._openai:
+            return f"foundry:{self.deployment}"
+        if self._ollama:
+            return f"ollama:{self.ollama_model}"
+        return "offline"
+
+    def _ollama_complete(self, system, user):
+        import urllib.request
+        body = json.dumps({"model": self.ollama_model, "stream": False,
+                           "messages": [{"role": "system", "content": system},
+                                        {"role": "user", "content": user}]}).encode()
+        req = urllib.request.Request(self.ollama_url + "/api/chat", data=body,
+                                     headers={"Content-Type": "application/json"})
+        with urllib.request.urlopen(req, timeout=180) as r:
+            return json.loads(r.read().decode())["message"]["content"]
 
     def complete(self, system, user):
+        if self._ollama:
+            try:
+                return self._ollama_complete(system, user)
+            except Exception as exc:
+                print(f"[warn] Ollama call failed ({exc}) — deterministic fallback.")
+                return None
         if not self._openai:
             return None
         try:

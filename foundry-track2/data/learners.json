@@ -1,0 +1,7 @@
+[
+  { "learner_id": "L-1001", "name": "Synthetic Learner A", "role": "Developer", "certification": "KISS-201", "practice_score_avg": 67, "hours_studied": 6, "status": "studying" },
+  { "learner_id": "L-1002", "name": "Synthetic Learner B", "role": "Project Manager", "certification": "KISS-201", "practice_score_avg": 82, "hours_studied": 12, "status": "studying" },
+  { "learner_id": "L-1003", "name": "Synthetic Learner C", "role": "Developer", "certification": "KISS-101", "practice_score_avg": 91, "hours_studied": 8, "status": "passed" },
+  { "learner_id": "L-1004", "name": "Synthetic Learner D", "role": "Designer", "certification": "KISS-101", "practice_score_avg": 58, "hours_studied": 3, "status": "studying" },
+  { "learner_id": "L-1005", "name": "Synthetic Learner E", "role": "Project Manager", "certification": "KISS-301", "practice_score_avg": 71, "hours_studied": 9, "status": "studying" }
+]

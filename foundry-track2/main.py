@@ -1,71 +1,90 @@
 #!/usr/bin/env python3
-"""
-KISS Multi-Agent Orchestration for Track 2: Reasoning Agents
-Demonstrates multi-agent reasoning about project scope, decisions, and planning.
+"""KISS AI-Collaboration Certification — Track 2: Reasoning Agents.
+
+Multi-agent enterprise learning system (Microsoft Foundry + the three IQ
+layers) that teaches and certifies teams on the KISS methodology, with an
+applied exam that performs live scope governance on a real project.
+
+Usage:
+  python main.py                 # full demo: learner journeys + scope exam + manager view
+  python main.py --learner L-1001
+  python main.py --request "Add blockchain payment integration"
 """
 
-import os
+import argparse
+import json
 from pathlib import Path
-from dotenv import load_dotenv
-from agents.orchestrator import KISSOrchestrator
-from utils.knowledge_loader import KnowledgeLoader
 
-load_dotenv()
+from dotenv import load_dotenv
+
+from agents.base_agent import AgentContext, ModelClient, TraceLogger
+from agents.orchestrator import KISSOrchestrator
+from iq.foundry_iq import FoundryIQ
+from iq.fabric_iq import FabricIQ
+from iq.work_iq import WorkIQ
+
+ROOT = Path(__file__).resolve().parent
+PIZZA = ROOT.parent / "demo-project" / "pizza-shop"
+
+
+def load_learners():
+    raw = json.loads((ROOT / "data" / "learners.json").read_text(encoding="utf-8"))
+    return raw["learners"] if isinstance(raw, dict) else raw
+
+
+def build_context():
+    foundry = FoundryIQ([ROOT / "knowledge", PIZZA, PIZZA / "agile"])
+    fabric = FabricIQ(ROOT / "data" / "ontology.json")
+    work = WorkIQ(ROOT / "data" / "work_signals.json")
+    return AgentContext(foundry, fabric, work, ModelClient(), TraceLogger())
+
+
+def show(title, text):
+    print("\n" + "=" * 62 + "\n" + title + "\n" + "-" * 62 + "\n" + text)
+
 
 def main():
-    """Main entry point for KISS reasoning agents."""
-    
-    # Initialize knowledge base from demo project
-    demo_project_path = Path(os.getenv("DEMO_PROJECT_PATH", "../demo-project/pizza-shop"))
-    
-    print("🧠 KISS Multi-Agent Reasoning System")
-    print("=" * 50)
-    print(f"Loading project knowledge from: {demo_project_path}")
-    
-    # Load knowledge
-    loader = KnowledgeLoader(demo_project_path)
-    knowledge = loader.load_all()
-    
-    print(f"✓ Loaded {len(knowledge)} knowledge files")
-    
-    # Initialize orchestrator
-    orchestrator = KISSOrchestrator(knowledge)
-    
-    # Example scenarios
-    scenarios = [
-        {
-            "request": "Can we add blockchain payment integration?",
-            "context": "User asking about a new feature during sprint"
-        },
-        {
-            "request": "What's our current sprint status?",
-            "context": "Manager requesting project health check"
-        },
-        {
-            "request": "Why did we decide to use TypeScript?",
-            "context": "Team member asking about past decisions"
-        }
-    ]
-    
-    print("\n🔄 Running Multi-Agent Reasoning Scenarios")
-    print("=" * 50)
-    
-    for i, scenario in enumerate(scenarios, 1):
-        print(f"\n[Scenario {i}] {scenario['request']}")
-        print(f"Context: {scenario['context']}")
-        print("-" * 50)
-        
-        # Get reasoning from agents
-        result = orchestrator.process_request(
-            request=scenario["request"],
-            context=scenario["context"]
-        )
-        
-        print(f"Decision: {result['decision']}")
-        print(f"Reasoning: {result['reasoning']}")
-        if result.get('recommendation'):
-            print(f"Recommendation: {result['recommendation']}")
-        print()
+    load_dotenv()
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--learner", help="run journey for one synthetic learner id")
+    ap.add_argument("--request", help="run the applied scope exam for a feature request")
+    args = ap.parse_args()
+
+    ctx = build_context()
+    orch = KISSOrchestrator(ctx)
+    learners = load_learners()
+    vision_path = PIZZA / "agile" / "PRODUCT_VISION.md"
+    vision = vision_path.read_text(encoding="utf-8") if vision_path.exists() else ""
+
+    print("KISS Certification Reasoning Engine  |  model:", ctx.model.mode)
+    print("Synthetic data only — no real persons or tenant data.")
+    print("Trace file:", ctx.tracer.path.name)
+
+    if args.request:
+        r = orch.scope_request(args.request, vision)
+        show("APPLIED SCOPE EXAM — " + repr(args.request),
+             r["answer"] + "\nCritic: " + r["critic"]["verdict"])
+        return
+
+    targets = [l for l in learners if not args.learner or l["learner_id"] == args.learner]
+    for learner in targets[: (1 if args.learner else 2)]:
+        j = orch.learner_journey(learner)
+        lines = ["[" + name + "] " + step["answer"] for name, step in j["steps"].items()]
+        show("LEARNER JOURNEY — " + learner["learner_id"] + " (" + learner["role"] + ") → "
+             + j["target_certification"],
+             "\n\n".join(lines) + "\n\nCritic: " + j["critic"]["verdict"])
+
+    if not args.learner:
+        r = orch.scope_request("Add blockchain payment integration", vision)
+        show("APPLIED SCOPE EXAM — 'Add blockchain payment integration'",
+             r["answer"] + "\nCritic: " + r["critic"]["verdict"])
+
+        t = orch.team_insights(learners)
+        show("MANAGER INSIGHTS (aggregate, synthetic IDs only)", t["answer"])
+
+    print("\nFull reasoning trace: traces/" + ctx.tracer.path.name
+          + "\nQuery it:  python query.py \"blockchain\"")
+
 
 if __name__ == "__main__":
     main()

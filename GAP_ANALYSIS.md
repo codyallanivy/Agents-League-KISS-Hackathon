@@ -36,3 +36,10 @@
 ## Already captured (no action)
 
 Scope tiers + parking in DECISIONS.md, decision logging with why/revisit, session memory via PROJECT_STATE.md, AGENT_CONTEXT.md handoffs, BRAND_VOICE.md extraction, 4-column board, iteration log, risk-policy stop conditions.
+
+## Decision log (hackathon-week scope calls)
+
+- **D-H01** | 2026-06-11 | Track 1 demo = D&D campaign generator (survey = KISS intake; Track 2 governs scope live; Azure image gen for art) | Why: more creative than copy generation, showcases methodology on a fun project | Status: ACCEPTED
+- **D-H02** | 2026-06-11 | Adopt Accept/Warn/Block decision triad in Assessment Agent | Why: richer semantics than binary block | Status: ACCEPTED
+- **D-H03** | 2026-06-11 | Interactive AI video | Why parked: high risk, no rubric payoff, competes with submission requirements | Status: PARKED (Tier 2) | Revisit: all tracks submitted with >1 day to spare
+- **D-H04** | 2026-06-11 | Provider abstraction, AES encryption, Power Automate hooks | Why parked: product roadmap, not hackathon scope | Status: PARKED (Tier 3)

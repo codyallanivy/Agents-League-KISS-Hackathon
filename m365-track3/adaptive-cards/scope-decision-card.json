@@ -1,0 +1,33 @@
+{
+  "$schema": "http://adaptivecards.io/schemas/adaptive-card.json",
+  "type": "AdaptiveCard",
+  "version": "1.5",
+  "body": [
+    { "type": "TextBlock", "size": "Medium", "weight": "Bolder", "text": "🚫 Scope Decision: ${verdict}" },
+    {
+      "type": "ColumnSet",
+      "columns": [
+        { "type": "Column", "width": "stretch", "items": [
+          { "type": "TextBlock", "text": "${feature_request}", "wrap": true, "weight": "Bolder" },
+          { "type": "TextBlock", "text": "Tier ${tier} — ${tier_meaning}", "isSubtle": true, "wrap": true }
+        ]},
+        { "type": "Column", "width": "auto", "items": [
+          { "type": "TextBlock", "text": "${verdict}", "color": "${if(verdict == 'ACCEPT', 'Good', if(verdict == 'WARN', 'Warning', 'Attention'))}", "weight": "Bolder", "size": "Large" }
+        ]}
+      ]
+    },
+    { "type": "TextBlock", "text": "Why", "weight": "Bolder", "spacing": "Medium" },
+    { "type": "TextBlock", "text": "${reasoning}", "wrap": true },
+    { "type": "FactSet", "facts": [
+      { "title": "Action", "value": "${action}" },
+      { "title": "Revisit", "value": "${revisit}" },
+      { "title": "Trace", "value": "${run_id}" },
+      { "title": "Citations", "value": "${citations}" }
+    ]}
+  ],
+  "actions": [
+    { "type": "Action.Submit", "title": "Approve parking", "data": { "verb": "approve_park" } },
+    { "type": "Action.Submit", "title": "Override (Product Owner)", "data": { "verb": "override" } },
+    { "type": "Action.OpenUrl", "title": "Audit full trace", "url": "${trace_url}" }
+  ]
+}

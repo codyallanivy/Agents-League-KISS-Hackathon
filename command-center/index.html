@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>KISS Command Center</title>
+<style>
+  :root { --bg:#0b0e14; --panel:#121826; --edge:#1f2a3d; --ink:#d7e0ee; --dim:#7b8aa3;
+          --gold:#e9a13b; --good:#3ecf8e; --warn:#e9c46a; --bad:#e76f51; --acc:#5b8af5; }
+  * { margin:0; padding:0; box-sizing:border-box; font-family:"Cascadia Code","Consolas",monospace; }
+  body { background:var(--bg); color:var(--ink); min-height:100vh; padding:18px; }
+  header { display:flex; align-items:center; gap:14px; margin-bottom:16px; flex-wrap:wrap; }
+  header h1 { font-size:19px; letter-spacing:3px; color:var(--gold); font-weight:600; }
+  .badge { padding:4px 12px; border-radius:20px; font-size:12px; border:1px solid var(--edge); }
+  .b-foundry { color:#7ab8ff; border-color:#7ab8ff; } .b-ollama { color:var(--good); border-color:var(--good); }
+  .b-offline { color:var(--dim); border-color:var(--dim); }
+  .sub { color:var(--dim); font-size:11.5px; }
+  .grid { display:grid; grid-template-columns:1.25fr 1fr 1fr; gap:14px; }
+  @media (max-width:1100px){ .grid{ grid-template-columns:1fr; } }
+  .panel { background:var(--panel); border:1px solid var(--edge); border-radius:10px; padding:14px; min-height:120px; }
+  .panel h2 { font-size:11px; letter-spacing:2.5px; color:var(--gold); margin-bottom:10px; text-transform:uppercase; }
+  .col-span { grid-column:1 / -1; }
+  input, button { background:#0e1420; border:1px solid var(--edge); color:var(--ink); border-radius:6px; padding:8px 10px; font-size:13px; font-family:inherit; }
+  input { flex:1; } button { cursor:pointer; color:var(--gold); border-color:var(--gold); }
+  button:hover { background:var(--gold); color:#0b0e14; }
+  .row { display:flex; gap:8px; margin-bottom:10px; }
+  #chatlog, #scopelog { max-height:330px; overflow-y:auto; display:flex; flex-direction:column; gap:8px; }
+  .msg { padding:9px 11px; border-radius:8px; font-size:12.5px; line-height:1.55; white-space:pre-wrap; }
+  .me { background:#1a2436; align-self:flex-end; max-width:85%; }
+  .ai { background:#0e1726; border-left:3px solid var(--gold); max-width:95%; }
+  .cite { color:var(--dim); font-size:10.5px; margin-top:5px; }
+  .verdict { font-weight:700; font-size:15px; }
+  .ACCEPT { color:var(--good); } .WARN { color:var(--warn); } .BLOCK { color:var(--bad); }
+  .kcol { margin-bottom:10px; }
+  .kcol b { font-size:10.5px; letter-spacing:1.6px; color:var(--dim); }
+  .kcol div { font-size:12px; padding:5px 8px; background:#0e1726; border-radius:5px; margin-top:5px; border-left:3px solid var(--acc); }
+  .kcol.done div { border-left-color:var(--good); opacity:.75; }
+  .kcol.blocked div { border-left-color:var(--bad); }
+  .trace { font-size:11px; color:var(--dim); padding:7px 9px; background:#0e1726; border-radius:5px; margin-bottom:6px; }
+  .trace b { color:var(--acc); } .trace .m { color:var(--gold); }
+  .trace .a { color:var(--ink); display:block; margin-top:3px; }
+  #visionwrap svg { width:100%; height:auto; border-radius:8px; }
+  .hint { color:var(--dim); font-size:11px; font-style:italic; }
+</style>
+</head>
+<body>
+<header>
+  <h1>⬡ KISS COMMAND CENTER</h1>
+  <span class="badge b-offline" id="modelbadge">connecting…</span>
+  <span class="sub" id="statusline">local-first · your files never leave this machine</span>
+</header>
+<div class="grid">
+  <div class="panel">
+    <h2>Ask the Engine</h2>
+    <div id="chatlog"><div class="msg ai">Ask anything grounded in your project files — "why was blockchain blocked?", "what does KISS-201 cover?", "who is at capacity risk?"</div></div>
+    <div class="row" style="margin-top:10px"><input id="chatin" placeholder="ask the KISS coach…"><button onclick="send()">Send</button></div>
+  </div>
+  <div class="panel">
+    <h2>Scope Gate ✅⚠️🚫</h2>
+    <div class="row"><input id="scopein" placeholder='try: "add multiplayer pizza battles"'><button onclick="scope()">Check</button></div>
+    <div id="scopelog"></div>
+    <p class="hint" style="margin-top:8px">Every check is the real Assessment Agent reading PRODUCT_VISION.md — and every verdict is parked or passed by rule R-4.</p>
+  </div>
+  <div class="panel">
+    <h2>The Board — pizza-shop</h2>
+    <div id="board"></div>
+  </div>
+  <div class="panel col-span">
+    <h2>Reasoning Traces <span class="sub">(every prompt, every citation — queryable)</span></h2>
+    <div class="row"><input id="tracein" placeholder="filter traces… (e.g. blockchain)"><button onclick="loadTraces()">Search</button></div>
+    <div id="traces"></div>
+  </div>
+  <div class="panel col-span">
+    <h2>Vision Board <span class="sub">(docs → visual understanding)</span></h2>
+    <div id="visionwrap"><p class="hint">run `python visualize.py ../demo-project/pizza-shop` to generate</p></div>
+  </div>
+</div>
+<script>
+const $ = id => document.getElementById(id);
+const esc = s => (s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;");
+
+async function status(){
+  const s = await (await fetch("/api/status")).json();
+  const b = $("modelbadge");
+  const tier = s.model.split(":")[0];
+  b.textContent = s.model.toUpperCase();
+  b.className = "badge b-" + (tier === "foundry" ? "foundry" : tier === "ollama" ? "ollama" : "offline");
+  $("statusline").textContent = `${s.chunks} knowledge chunks indexed · trace: ${s.trace_file} · local-first`;
+}
+async function send(){
+  const v = $("chatin").value.trim(); if(!v) return; $("chatin").value = "";
+  $("chatlog").insertAdjacentHTML("beforeend", `<div class="msg me">${esc(v)}</div>`);
+  const r = await (await fetch("/api/chat",{method:"POST",body:JSON.stringify({message:v})})).json();
+  $("chatlog").insertAdjacentHTML("beforeend",
+    `<div class="msg ai">${esc(r.answer)}<div class="cite">${esc((r.cites||[]).join(" · "))}</div></div>`);
+  $("chatlog").scrollTop = 1e9; loadTraces();
+}
+async function scope(){
+  const v = $("scopein").value.trim(); if(!v) return;
+  const r = await (await fetch("/api/scope",{method:"POST",body:JSON.stringify({request:v})})).json();
+  $("scopelog").insertAdjacentHTML("afterbegin",
+    `<div class="msg ai"><span class="verdict ${r.verdict}">${r.verdict}</span> — Tier ${r.tier}\n${esc(r.answer)}<div class="cite">critic: ${r.critic} · ${esc((r.cites||[]).join(" · "))}</div></div>`);
+  loadTraces();
+}
+async function loadBoard(){
+  const b = await (await fetch("/api/board")).json();
+  $("board").innerHTML =
+    `<div class="kcol"><b>NOW (${b.now.length})</b>${b.now.map(t=>`<div>${esc(t)}</div>`).join("")}</div>` +
+    `<div class="kcol blocked"><b>BLOCKED (${b.blocked.length})</b>${b.blocked.map(t=>`<div>${esc(t)}</div>`).join("")}</div>` +
+    `<div class="kcol done"><b>DONE (${b.done.length})</b>${b.done.map(t=>`<div>${esc(t)}</div>`).join("")}</div>`;
+}
+async function loadTraces(){
+  const q = $("tracein").value.trim();
+  const t = await (await fetch("/api/traces?q="+encodeURIComponent(q))).json();
+  $("traces").innerHTML = t.map(s =>
+    `<div class="trace"><b>${esc(s.agent)}</b> <span class="m">${esc(s.model)}</span> ${esc(s.ts)}<span class="a">${esc(s.answer)}</span>${s.cites.length?`<span>cites: ${esc(s.cites.join(" · "))}</span>`:""}</div>`).join("") || '<p class="hint">no matching steps</p>';
+}
+async function loadVision(){
+  const v = await (await fetch("/api/vision")).json();
+  if(v.svg) $("visionwrap").innerHTML = v.svg;
+}
+$("chatin").addEventListener("keydown", e=>{ if(e.key==="Enter") send(); });
+$("scopein").addEventListener("keydown", e=>{ if(e.key==="Enter") scope(); });
+$("tracein").addEventListener("keydown", e=>{ if(e.key==="Enter") loadTraces(); });
+status(); loadBoard(); loadTraces(); loadVision();
+</script>
+</body>
+</html>

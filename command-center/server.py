@@ -21,6 +21,7 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parent
 sys.path.insert(0, str(ROOT / "foundry-track2"))
+sys.path.insert(0, str(ROOT / "creative-track1"))
 
 from agents.base_agent import AgentContext, ModelClient, TraceLogger  # noqa: E402
 from agents.orchestrator import KISSOrchestrator                      # noqa: E402
@@ -263,8 +264,10 @@ def traces(q=""):
     return steps[-30:][::-1]
 
 
-def chat(message):
+def chat(message, file_context=""):
     grounding = CTX.foundry_iq.retrieve(message)
+    if file_context:
+        grounding = [{"citation": f"{ACTIVE} project files (live)", "snippet": file_context[:1200]}] + grounding[:3]
     system = ("You are the KISS Agile coach. Answer from the cited project knowledge; "
               "protect scope; be concise and warm. Cite sources in [brackets].")
     cites = "\n\n".join(f"[{g['citation']}]\n{g['snippet']}" for g in grounding) or "(none)"
@@ -512,6 +515,33 @@ class H(BaseHTTPRequestHandler):
         else:
             self._json({"error": "not found"}, 404)
 
+    def _survey_questions(self, data):
+            idea = data.get("idea", "").strip()
+            qs = None
+            if CTX.model.mode != "offline" and idea:
+                raw = CTX.model.complete(
+                    "You design project-intake surveys. Given an idea, return EXACTLY a "
+                    "JSON array of 5 short intake questions tailored to that idea — "
+                    "covering: a name/seed, the look/feel or tone, the single must-have "
+                    "for v1, what is explicitly out of scope, and who it is for. "
+                    'Format: [{"q": "...", "placeholder": "..."}]. JSON only.',
+                    "IDEA: " + idea[:400])
+                try:
+                    s = raw[raw.index("["):raw.rindex("]") + 1]
+                    qs = json.loads(s)[:5]
+                    qs = [q for q in qs if isinstance(q, dict) and q.get("q")]
+                except Exception:
+                    qs = None
+            if not qs:
+                qs = [
+                    {"q": "What should we call it? (a name or a few seed words)", "placeholder": "name / seed words"},
+                    {"q": "What's the look and feel? (tone, mood, style)", "placeholder": "e.g. warm and playful / dark and serious"},
+                    {"q": "The ONE thing v1 must have?", "placeholder": "the must-have"},
+                    {"q": "What is explicitly OUT of scope for now?", "placeholder": "the off-limits"},
+                    {"q": "Who is it for?", "placeholder": "audience"},
+                ]
+            self._json({"questions": qs, "model": CTX.model.mode})
+
     def do_POST(self):
         global ACTIVE, PROJECTS
         n = int(self.headers.get("Content-Length", 0))
@@ -580,32 +610,53 @@ class H(BaseHTTPRequestHandler):
         elif self.path == "/api/todo":
             ok = toggle_todo(data.get("line", ""), data.get("done", True))
             self._json({"ok": ok, **board()})
-        elif self.path == "/api/survey-questions":
-            idea = data.get("idea", "").strip()
-            qs = None
-            if CTX.model.mode != "offline" and idea:
+        elif self.path == "/api/creative-chat":
+            msg = data.get("message", "").strip()
+            low = msg.lower()
+            doc = proj() / "CAMPAIGN.md"
+            if any(low.startswith(w) for w in ("survey me", "new project", "build me", "i want to build", "i want to create", "create a new")):
+                self.path = "/api/survey-questions"  # fallthrough not possible; call logic inline below
+                data["idea"] = msg
+                return self._survey_questions(data)
+            edit_words = ("edit", "change", "make ", "rewrite", "add ", "remove", "retitle", "rename", "expand", "shorten", "darker", "lighter")
+            if any(w in low for w in edit_words) and doc.exists():
+                if CTX.model.mode == "offline":
+                    self._json({"type": "chat", "answer": "(offline tier) Document editing needs a model — start Ollama or connect Foundry. I can still answer questions about the project.", "cites": []})
+                    return
+                ad = art_direction()
+                assets_list = ", ".join(Path(a.split("p=")[1]).name for a in assets()) or "none"
                 raw = CTX.model.complete(
-                    "You design project-intake surveys. Given an idea, return EXACTLY a "
-                    "JSON array of 5 short intake questions tailored to that idea — "
-                    "covering: a name/seed, the look/feel or tone, the single must-have "
-                    "for v1, what is explicitly out of scope, and who it is for. "
-                    'Format: [{"q": "...", "placeholder": "..."}]. JSON only.',
-                    "IDEA: " + idea[:400])
-                try:
-                    s = raw[raw.index("["):raw.rindex("]") + 1]
-                    qs = json.loads(s)[:5]
-                    qs = [q for q in qs if isinstance(q, dict) and q.get("q")]
-                except Exception:
-                    qs = None
-            if not qs:
-                qs = [
-                    {"q": "What should we call it? (a name or a few seed words)", "placeholder": "name / seed words"},
-                    {"q": "What's the look and feel? (tone, mood, style)", "placeholder": "e.g. warm and playful / dark and serious"},
-                    {"q": "The ONE thing v1 must have?", "placeholder": "the must-have"},
-                    {"q": "What is explicitly OUT of scope for now?", "placeholder": "the off-limits"},
-                    {"q": "Who is it for?", "placeholder": "audience"},
-                ]
-            self._json({"questions": qs, "model": CTX.model.mode})
+                    "You are the project's creative editor. Apply the user's instruction to "
+                    "the creation document. Stay true to the project's tone and scope; "
+                    "original content only, PG-13. Return ONLY the complete updated "
+                    "Markdown document, no commentary.",
+                    f"PROJECT: tone={ad['tone']}; about: {ad['goal']}\n"
+                    f"EXISTING ASSETS: {assets_list}\n\nINSTRUCTION: {msg}\n\n"
+                    f"DOCUMENT:\n{read(doc)[:9000]}")
+                if raw and len(raw.strip()) > 100:
+                    (proj() / "CAMPAIGN_prev.md").write_text(read(doc), encoding="utf-8")
+                    doc.write_text(raw.strip(), encoding="utf-8")
+                    with open(proj() / "ITERATION_LOG.md", "a", encoding="utf-8") as fh:
+                        fh.write(f"\n## {time.strftime('%Y-%m-%d %H:%M')} — creative chat edit\n"
+                                 f"Instruction: {msg[:140]} (previous saved to CAMPAIGN_prev.md)\n")
+                    CTX.tracer.log(agent="CreativeChat", model=CTX.model.mode,
+                                   prompt={"system": "doc-edit", "user": msg},
+                                   output={"answer": "document updated"}, extra={"project": ACTIVE})
+                    self._json({"type": "edited",
+                                "answer": "✓ Document updated (previous version kept as CAMPAIGN_prev.md, logged to ITERATION_LOG). "
+                                          + raw.strip()[:300] + "…"})
+                else:
+                    self._json({"type": "chat", "answer": "The edit didn't produce a usable document — try rewording.", "cites": []})
+                return
+            # default: grounded chat that LOOKS AT the active project's files directly
+            fc = (f"PROJECT_STATE: {read(proj() / 'PROJECT_STATE.md')[:500]}\n"
+                  f"VISION: {(read(proj() / 'PRODUCT_VISION.md') or read(proj() / 'agile/PRODUCT_VISION.md'))[:500]}\n"
+                  f"CREATION DOC: {read(doc)[:700]}\n"
+                  f"ASSETS: {', '.join(Path(a.split('p=')[1]).name for a in assets()) or 'none'}")
+            c = chat(msg, file_context=fc)
+            self._json({"type": "chat", **c})
+        elif self.path == "/api/survey-questions":
+            return self._survey_questions(data)
         elif self.path == "/api/campaign":
             import random as _rnd
             sys.path.insert(0, str(ROOT / "creative-track1"))

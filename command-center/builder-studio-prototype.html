@@ -1308,6 +1308,84 @@
     gap: 8px;
   }
 
+  .kiss-iq-dock {
+    position: fixed;
+    right: 16px;
+    bottom: 16px;
+    width: min(360px, calc(100vw - 32px));
+    z-index: 50;
+    border: 1px solid rgba(244, 185, 78, 0.72);
+    border-radius: 10px;
+    background: rgba(14, 18, 28, 0.96);
+    color: #d7e0ee;
+    box-shadow: 0 16px 34px rgba(0, 0, 0, 0.48);
+    overflow: hidden;
+  }
+
+  .kiss-iq-head {
+    width: 100%;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    color: var(--gold);
+    padding: 10px 12px;
+    text-align: left;
+    font-size: 11px;
+    letter-spacing: 1.6px;
+    text-transform: uppercase;
+  }
+
+  .kiss-iq-body {
+    display: none;
+    padding: 0 12px 12px;
+  }
+
+  .kiss-iq-dock.open .kiss-iq-body {
+    display: grid;
+    gap: 8px;
+  }
+
+  .kiss-iq-dock textarea {
+    min-height: 74px;
+    background: #0e1420;
+    border-color: #1f2a3d;
+    color: #d7e0ee;
+  }
+
+  .kiss-iq-output {
+    max-height: 210px;
+    overflow: auto;
+    border: 1px solid #1f2a3d;
+    border-radius: 6px;
+    padding: 8px;
+    background: rgba(9, 12, 18, 0.74);
+    color: #d7e0ee;
+    font-size: 11px;
+    line-height: 1.5;
+    white-space: pre-wrap;
+  }
+
+  .kiss-iq-cites {
+    margin-top: 6px;
+    color: #7b8aa3;
+    font-size: 10px;
+  }
+
+  .kiss-iq-ACCEPT {
+    color: var(--good);
+    font-weight: 700;
+  }
+
+  .kiss-iq-WARN {
+    color: var(--warn);
+    font-weight: 700;
+  }
+
+  .kiss-iq-BLOCK {
+    color: var(--bad);
+    font-weight: 700;
+  }
+
   .source-list {
     display: grid;
     gap: 5px;
@@ -1549,8 +1627,8 @@
     <label class="toggle" title="Show explanations with every action">
       <input id="explainToggle" type="checkbox" checked onchange="setExplain(this.checked)"> Explain
     </label>
-    <label class="toggle" title="Use the mock Foundry grounding panel. This prototype does not call your account.">
-      <input id="foundryToggle" type="checkbox" onchange="setFoundry(this.checked)"> Foundry Mock
+    <label class="toggle" title="Open KISS IQ. Uses the local engine when available; otherwise the visual builder stays offline.">
+      <input id="foundryToggle" type="checkbox" onchange="setFoundry(this.checked)"> KISS IQ
     </label>
     <button class="small" id="tutorialButton" onclick="toggleTutorial()">Tutorial</button>
     <button class="small" id="previewOnlyButton" onclick="togglePreviewOnly()">Preview Only</button>
@@ -1710,9 +1788,9 @@
       </div>
 
       <div class="suggest-card">
-        <h3>Foundry IQ Mock</h3>
+        <h3>KISS IQ</h3>
         <span class="badge warn" id="foundryStatus">off - 0 tokens</span>
-        <p id="foundryGuide">Grounding layer is ready to explain why each build step matters.</p>
+        <p id="foundryGuide">Engine-backed guidance can validate scope and return cited project advice.</p>
         <div id="foundrySources" class="source-list"></div>
       </div>
 
@@ -1761,6 +1839,20 @@
   </section>
 </main>
 
+<section id="kissIqDock" class="kiss-iq-dock" aria-label="KISS IQ Azure guidance">
+  <button class="kiss-iq-head" type="button" onclick="toggleKissIqDock()">KISS IQ - connecting...</button>
+  <div class="kiss-iq-body">
+    <div id="kissIqStatus" class="hint">Foundry IQ guidance, Fabric IQ scope validation, and project-context chat.</div>
+    <textarea id="kissIqInput" placeholder="Ask for cited guidance or describe a feature to validate..."></textarea>
+    <div class="flow-actions">
+      <button class="small primary" onclick="runKissIqScope()">Validate Scope</button>
+      <button class="small" onclick="runKissIqGuide()">Cited Guidance</button>
+      <button class="small" onclick="prefillKissIqFromBuild()">Use Current Build</button>
+    </div>
+    <div id="kissIqOutput" class="kiss-iq-output">Start the Command Center engine to connect Azure/Foundry-backed IQ. Offline mode still keeps the local builder working.</div>
+  </div>
+</section>
+
 <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/xml/xml.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/javascript/javascript.min.js"></script>
@@ -1771,6 +1863,7 @@ const $ = id => document.getElementById(id);
 const uid = prefix => prefix + "-" + Math.random().toString(36).slice(2, 8);
 const PROTOTYPE_FILE_PATH = "D:/Repositories/agile studio templates/Agile Studio Product.worktrees/agents-hackathon-copilot-integration/Agents-League-KISS-Hackathon/command-center/builder-studio-prototype.html";
 const WORKFLOW_MODES = ["plan", "build", "code", "test", "export"];
+const KISS_IQ_API = location.protocol === "file:" ? "http://localhost:8765" : "";
 const esc = value => String(value ?? "")
   .replace(/&/g, "&amp;")
   .replace(/</g, "&lt;")
@@ -2168,8 +2261,12 @@ function setExplain(enabled) {
 
 function setFoundry(enabled) {
   state.foundryEnabled = enabled;
-  addAudit(enabled ? "Foundry mock enabled. No account calls are made in this prototype." : "Foundry mock disabled. Local-only guidance is active.");
+  addAudit(enabled ? "KISS IQ enabled. Engine-backed guidance will be used when available." : "KISS IQ disabled. Local-only guidance is active.");
   saveState();
+  if (enabled) {
+    toggleKissIqDock(true);
+    bootKissIq();
+  }
   renderFoundryGuide();
   renderModeDetail();
   renderTerminal();
@@ -2379,6 +2476,7 @@ function createPlan() {
   saveState();
   addAudit("Planner created a KISS plan for: " + goal);
   render();
+  requestKissPlanGuidance(goal);
 }
 
 function recommendTemplate(goal) {
@@ -3235,17 +3333,24 @@ function renderLocalAgents() {
 function foundryInsight() {
   if (!state.foundryEnabled) {
     return {
-      title: "Foundry is off",
-      text: "Local Tutor, Builder, and Interaction agents are guiding this prototype. No Foundry account, API call, or token spend is used here.",
+      title: "KISS IQ is off",
+      text: "Local Tutor, Builder, and Interaction agents are guiding this prototype. Turn KISS IQ on for engine-backed scope checks and cited guidance.",
       sources: ["Local-only mode", "Prototype memory"]
+    };
+  }
+  if (window.KISS_IQ_ON) {
+    return {
+      title: "KISS IQ connected",
+      text: "The Command Center engine is available. Scope validation uses Fabric IQ rules; guidance uses the active project's indexed knowledge and current model tier.",
+      sources: ["Command Center /api/status", "Fabric IQ scope gate", "Foundry IQ retrieval"]
     };
   }
   const selected = getSelected();
   if (!state.plan) {
     return {
-      title: "Grounded planning",
-      text: "Foundry IQ would retrieve relevant product, accessibility, and security guidance before the planner commits to a path.",
-      sources: ["Foundry IQ mock: grounded planner knowledge", "Internal project memory from prior builds"]
+      title: "Engine not connected",
+      text: "Start the Command Center engine to use Azure/Foundry-backed guidance. The local visual builder remains available offline.",
+      sources: ["Offline builder mode", "Local prototype memory"]
     };
   }
   if (selected?.type === "input") {
@@ -3284,10 +3389,106 @@ function renderFoundryGuide() {
   const status = $("foundryStatus");
   if (status) {
     status.className = state.foundryEnabled ? "badge gold" : "badge warn";
-    status.textContent = state.foundryEnabled ? "mock on - 0 real tokens" : "off - 0 tokens";
+    status.textContent = state.foundryEnabled
+      ? (window.KISS_IQ_ON ? "engine connected" : "checking engine")
+      : "off - 0 tokens";
   }
   box.innerHTML = `<strong>${esc(insight.title)}</strong><br>${esc(insight.text)}`;
   sources.innerHTML = insight.sources.map(source => `<span>${esc(source)}</span>`).join("");
+}
+
+async function kissIqApi(path, body) {
+  const options = body
+    ? { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }
+    : undefined;
+  const response = await fetch(KISS_IQ_API + path, options);
+  if (!response.ok) throw new Error(`KISS IQ request failed: ${response.status}`);
+  return response.json();
+}
+
+function toggleKissIqDock(force) {
+  const dock = $("kissIqDock");
+  if (!dock) return;
+  if (typeof force === "boolean") dock.classList.toggle("open", force);
+  else dock.classList.toggle("open");
+}
+
+function setKissIqOutput(html) {
+  const out = $("kissIqOutput");
+  if (out) out.innerHTML = html;
+}
+
+function prefillKissIqFromBuild() {
+  const goal = state.plan?.goal || $("goalInput")?.value?.trim() || "this build";
+  const selected = getSelected();
+  const componentText = selected
+    ? ` Selected component: ${selected.name} (${selected.type}).`
+    : "";
+  const flows = state.flows.length ? ` Current interactions: ${state.flows.map(item => item.name).join(", ")}.` : "";
+  $("kissIqInput").value = `Review this Builder Studio plan for scope and guidance: ${goal}.${componentText}${flows}`;
+  toggleKissIqDock(true);
+}
+
+async function bootKissIq() {
+  const dock = $("kissIqDock");
+  const head = dock?.querySelector(".kiss-iq-head");
+  const status = $("kissIqStatus");
+  try {
+    const result = await kissIqApi("/api/status");
+    window.KISS_IQ_ON = true;
+    if (head) head.textContent = `KISS IQ - ${String(result.model || "engine").toUpperCase()} - ${result.active || "project"}`;
+    if (status) status.textContent = "Connected: Foundry IQ guidance, Fabric IQ scope validation, and project-context chat are available.";
+    renderFoundryGuide();
+    return result;
+  } catch {
+    window.KISS_IQ_ON = false;
+    if (head) head.textContent = "KISS IQ - engine offline";
+    if (status) status.textContent = "Run start.bat option 6 to connect the Command Center engine. The visual builder still works offline.";
+    renderFoundryGuide();
+    return null;
+  }
+}
+
+async function runKissIqScope() {
+  const input = $("kissIqInput")?.value.trim();
+  if (!input) return;
+  toggleKissIqDock(true);
+  setKissIqOutput("Checking this feature against the active project's vision...");
+  try {
+    const result = await kissIqApi("/api/scope", { request: input });
+    setKissIqOutput(
+      `<span class="kiss-iq-${esc(result.verdict)}">${esc(result.verdict)}</span> ` +
+      `(Tier ${esc(result.tier)}) - ${esc(result.answer)}` +
+      `<div class="kiss-iq-cites">Fabric IQ rule R-4 - critic: ${esc(result.critic)} - project: ${esc(result.project)}</div>`
+    );
+    addAudit("KISS IQ scope verdict: " + result.verdict);
+  } catch (error) {
+    setKissIqOutput(`KISS IQ is offline. Start the Command Center engine, then try again.\n${esc(error.message)}`);
+  }
+}
+
+async function runKissIqGuide() {
+  const input = $("kissIqInput")?.value.trim();
+  if (!input) return;
+  toggleKissIqDock(true);
+  setKissIqOutput("Retrieving cited guidance from the active project...");
+  try {
+    const result = await kissIqApi("/api/chat", { message: input });
+    const cites = result.cites?.length
+      ? `<div class="kiss-iq-cites">cites: ${esc(result.cites.join(" | "))}</div>`
+      : "";
+    setKissIqOutput(`${esc(result.answer || result.error || "No answer returned.")}${cites}`);
+    addAudit("KISS IQ returned cited guidance.");
+  } catch (error) {
+    setKissIqOutput(`KISS IQ is offline. Start the Command Center engine, then try again.\n${esc(error.message)}`);
+  }
+}
+
+function requestKissPlanGuidance(goal) {
+  $("kissIqInput").value = `Plan guidance for Builder Studio goal: ${goal}`;
+  toggleKissIqDock(true);
+  if (window.KISS_IQ_ON) runKissIqGuide();
+  else bootKissIq();
 }
 
 function explainSelected() {
@@ -4012,19 +4213,19 @@ function assistantAnswer(input) {
     next = ["Switch to Code mode", "Copy Code", "Download HTML"];
   } else if (/(foundry|token|cost|account|connected)/.test(text)) {
     answer = state.foundryEnabled
-      ? "Foundry Mock is on, but this standalone prototype still does not call your account. It is a visual mock only, so it spends 0 real tokens."
-      : "Foundry is off. This prototype is using local-only guidance and spends 0 Foundry tokens. It is not connected to your account.";
-    next = ["Foundry off?", "How do local agents work?", "help"];
+      ? "KISS IQ is on. If the Command Center engine is running, scope checks and cited guidance use the active engine/model tier. If the engine is offline, the builder stays local-only."
+      : "KISS IQ is off. This prototype is using local-only guidance and does not spend Foundry or Azure tokens.";
+    next = ["Validate scope", "Cited guidance", "How do local agents work?"];
   }
   if (state.foundryEnabled) {
-    answer += "\n\nFoundry mock note: grounded citations would appear here in a real integration. This prototype still uses local mock text only.";
+    answer += "\n\nKISS IQ note: open the KISS IQ dock to see engine status, scope verdicts, and citations.";
   }
   return {
     input,
     status: "assistant",
     resultText: answer,
     explanation: "Tutor Agent answered locally from the current prototype state.",
-    whatIf: state.foundryEnabled ? "A real Foundry integration could add grounded citations after user approval." : "Foundry is off, so no external grounding request is made.",
+    whatIf: state.foundryEnabled ? "Engine-backed guidance can add grounded citations when the Command Center server is running." : "KISS IQ is off, so no external grounding request is made.",
     suggestedNextActions: next,
     filesystemChanges: []
   };
@@ -4123,6 +4324,9 @@ $("goalInput").addEventListener("keydown", event => {
 });
 
 render();
+bootKissIq().then(() => {
+  if (state.foundryEnabled) toggleKissIqDock(true);
+});
 </script>
 </body>
 </html>

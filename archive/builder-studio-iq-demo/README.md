@@ -1,7 +1,8 @@
-# Builder Studio — an IQ-governed visual builder (KISS Studio, submission #2)
+# Archived Builder Studio IQ Demo
 
-> Most visual builders help you assemble screens. **Builder Studio asks whether you *should*** — every plan, component, and feature idea can be validated against your project's own vision and answered with **cited** guidance, because the canvas is plugged into the KISS reasoning engine.
-> Synthetic data only; shares its intelligence backend with [KISS Studio](../README.md) — one engine, two surfaces.
+This folder preserves the older IQ-connected Builder Studio demo for reference. The active Builder Studio is now `../../command-center/builder-studio-prototype.html` and is served at `http://localhost:8765/builder`.
+
+The IQ behavior from this demo has been merged into the advanced builder as the KISS IQ dock.
 
 ## Run it
 

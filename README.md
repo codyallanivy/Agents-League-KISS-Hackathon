@@ -52,9 +52,9 @@ Three views over the same engine: **Assistant** (chat + model compare), **Projec
 
 ## Companion submission: Builder Studio
 
-`command-center/builder-studio-prototype.html` — the latest recovered visual builder prototype: Plan → Build → Code → Test → Export, CodeMirror code editing, selected-component styling, behavior editing, smart terminal, preview-only inspector, and local/Foundry mock controls. Run `start.bat` option 6 or open `http://localhost:8765/builder`.
+`command-center/builder-studio-prototype.html` — the advanced visual builder: Plan → Build → Code → Test → Export, CodeMirror code editing, selected-component styling, behavior editing, smart terminal, preview-only inspector, and KISS IQ scope/citation controls. Run `start.bat` option 6 or open `http://localhost:8765/builder`.
 
-`builder-studio/` is preserved as the older IQ-connected demo at `http://localhost:8765/builder-iq` for cited planning guidance, scope validation, and project-context chat.
+The older IQ-only demo is archived at `archive/builder-studio-iq-demo/` and remains viewable at `http://localhost:8765/builder-iq` for reference.
 
 ## Why this is different
 

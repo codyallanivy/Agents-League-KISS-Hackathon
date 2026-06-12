@@ -1,0 +1,298 @@
+- generic [active] [ref=e1]:
+  - banner [ref=e2]:
+    - generic [ref=e4]:
+      - heading "BUILDER STUDIO" [level=1] [ref=e5]
+      - generic [ref=e6]: KISS guided creation prototype
+    - navigation "Builder mode" [ref=e7]:
+      - button "Plan" [ref=e8] [cursor=pointer]
+      - button "Build" [ref=e9] [cursor=pointer]
+      - button "Code" [ref=e10] [cursor=pointer]
+      - button "Test" [ref=e11] [cursor=pointer]
+      - button "Export" [ref=e12] [cursor=pointer]
+    - generic [ref=e13]:
+      - generic "Show hidden advanced tools" [ref=e14]:
+        - checkbox "Expert" [ref=e15]
+        - text: Expert
+      - generic "Hide side panels and keep the current step visible" [ref=e16]:
+        - checkbox "Focus" [ref=e17]
+        - text: Focus
+      - generic "Show explanations with every action" [ref=e18]:
+        - checkbox "Explain" [checked] [ref=e19]
+        - text: Explain
+      - generic "Use the mock Foundry grounding panel. This prototype does not call your account." [ref=e20]:
+        - checkbox "Foundry Mock" [ref=e21]
+        - text: Foundry Mock
+      - button "Hide Tutorial" [ref=e22] [cursor=pointer]
+      - button "Preview Only" [ref=e23] [cursor=pointer]
+      - button "Reset" [ref=e24] [cursor=pointer]
+      - button "Export Model" [ref=e25] [cursor=pointer]
+  - main [ref=e26]:
+    - region "KISS planner" [ref=e27]:
+      - generic [ref=e28]:
+        - heading "Simple Studio" [level=2] [ref=e29]
+        - generic [ref=e30]:
+          - generic [ref=e31]: plan
+          - button "-" [ref=e32] [cursor=pointer]
+      - generic [ref=e33]:
+        - generic [ref=e34]:
+          - generic [ref=e35]: Project name
+          - textbox "Project name" [ref=e36]: First Guided Build
+        - generic [ref=e37]:
+          - generic [ref=e38]: What are you building?
+          - textbox "What are you building?" [ref=e39]: I want to build a simple landing page with a signup button
+          - button "Plan with KISS" [ref=e40] [cursor=pointer]
+        - generic [ref=e41]: Describe the goal first. The studio will reveal only the tools needed for that build.
+        - generic [ref=e42]:
+          - generic [ref=e43]:
+            - generic [ref=e44]: Plan steps
+            - button "Advance Step" [ref=e45] [cursor=pointer]
+          - generic [ref=e47]: No plan yet.
+        - generic [ref=e48]:
+          - generic [ref=e49]: Templates
+          - combobox "Templates" [ref=e50]:
+            - option "all project types" [selected]
+            - option "webpage"
+            - option "phone app"
+            - option "calculator"
+            - option "CLI script"
+            - option "automation"
+          - generic [ref=e51]:
+            - generic [ref=e52]:
+              - heading "Simple Webpage" [level=3] [ref=e53]
+              - paragraph [ref=e54]: A landing page with a title, supporting text, and one clear action.
+              - generic [ref=e55]:
+                - generic [ref=e56]: beginner
+                - generic [ref=e57]: html
+              - button "Apply Template" [ref=e58] [cursor=pointer]
+            - generic [ref=e59]:
+              - heading "Phone App Screen" [level=3] [ref=e60]
+              - paragraph [ref=e61]: A mobile-style screen with a title, status text, and primary action.
+              - generic [ref=e62]:
+                - generic [ref=e63]: beginner
+                - generic [ref=e64]: html
+              - button "Apply Template" [ref=e65] [cursor=pointer]
+            - generic [ref=e66]:
+              - heading "Basic Calculator" [level=3] [ref=e67]
+              - paragraph [ref=e68]: A calculator starter with display, keypad, and two starter flows.
+              - generic [ref=e69]:
+                - generic [ref=e70]: beginner
+                - generic [ref=e71]: logic
+              - button "Apply Template" [ref=e72] [cursor=pointer]
+            - generic [ref=e73]:
+              - heading "CLI Script Starter" [level=3] [ref=e74]
+              - paragraph [ref=e75]: A terminal-first starter for learning commands and scripted flows safely.
+              - generic [ref=e76]:
+                - generic [ref=e77]: beginner
+                - generic [ref=e78]: terminal
+              - button "Apply Template" [ref=e79] [cursor=pointer]
+            - generic [ref=e80]:
+              - heading "Automation Workflow" [level=3] [ref=e81]
+              - paragraph [ref=e82]: A trigger-action-result starter for small workflow automation.
+              - generic [ref=e83]:
+                - generic [ref=e84]: intermediate
+                - generic [ref=e85]: logic
+              - button "Apply Template" [ref=e86] [cursor=pointer]
+    - region "Build workspace" [ref=e87]:
+      - generic [ref=e88]:
+        - generic [ref=e89]:
+          - generic [ref=e90]:
+            - heading "Plan before tools" [level=2] [ref=e91]
+            - paragraph [ref=e92]: Goal first, tools second. Complexity appears only when it is useful.
+          - generic [ref=e93]:
+            - generic [ref=e94]: no template
+            - generic [ref=e95]: 0 components
+        - generic "Build workflow navigation" [ref=e96]:
+          - button "Previous" [disabled] [ref=e97] [cursor=pointer]
+          - generic [ref=e98]:
+            - button "1. Plan" [ref=e99] [cursor=pointer]
+            - button "2. Build" [ref=e100] [cursor=pointer]
+            - button "3. Code" [ref=e101] [cursor=pointer]
+            - button "4. Test" [ref=e102] [cursor=pointer]
+            - button "5. Export" [ref=e103] [cursor=pointer]
+          - 'button "Next: Build" [ref=e104] [cursor=pointer]'
+        - generic [ref=e105]:
+          - generic [ref=e106]:
+            - generic [ref=e107]: Level 1 - Structure
+            - generic [ref=e108]: Text, headings, buttons, inputs.
+          - generic [ref=e109]:
+            - generic [ref=e110]: Level 2 - Layout
+            - generic [ref=e111]: Containers, spacing, visual grouping.
+          - generic [ref=e112]:
+            - generic [ref=e113]: Level 3 - Behavior
+            - generic [ref=e114]: Events, actions, simple logic.
+          - generic [ref=e115]:
+            - generic [ref=e116]: Level 4 - Translate
+            - generic [ref=e117]: Export model and starter source.
+        - generic [ref=e118]:
+          - generic [ref=e119]:
+            - generic [ref=e120]: Beginner next step
+            - heading "Describe" [level=3] [ref=e121]
+            - paragraph [ref=e122]: Write what you want to build.
+            - generic [ref=e123]:
+              - button "Plan it" [ref=e124] [cursor=pointer]
+              - button "Hide" [ref=e125] [cursor=pointer]
+          - generic [ref=e126]:
+            - heading "How planning turns into an app" [level=3] [ref=e127]
+            - generic [ref=e128]:
+              - generic [ref=e129]:
+                - generic [ref=e130]: 1. Describe
+                - text: Write what you want to build.
+              - generic [ref=e131]:
+                - generic [ref=e132]: 2. Template
+                - text: Apply the recommended starter.
+              - generic [ref=e133]:
+                - generic [ref=e134]: 3. Look
+                - text: Use the CAD-style viewport.
+              - generic [ref=e135]:
+                - generic [ref=e136]: 4. Select
+                - text: Click a block to edit it.
+              - generic [ref=e137]:
+                - generic [ref=e138]: 5. Interact
+                - text: Add one when-this-then-that flow.
+              - generic [ref=e139]:
+                - generic [ref=e140]: 6. Check
+                - text: Run checks before export.
+        - generic [ref=e141]:
+          - generic:
+            - generic [ref=e142]:
+              - generic [ref=e143]: Relevant tools
+              - generic [ref=e144]: Plan first to filter tools.
+            - generic [ref=e146]: No tools yet. Create a plan or apply a template.
+          - generic [ref=e147]:
+            - generic [ref=e148]:
+              - generic [ref=e149]:
+                - generic [ref=e150]: Build Space
+                - generic [ref=e151]: Planner Agent
+              - generic [ref=e152]:
+                - button "Zoom -" [ref=e153] [cursor=pointer]
+                - generic [ref=e154]: 100%
+                - button "Zoom +" [ref=e155] [cursor=pointer]
+                - button "Fit" [ref=e156] [cursor=pointer]
+                - button "100%" [ref=e157] [cursor=pointer]
+                - button "Duplicate" [ref=e158] [cursor=pointer]
+                - button "Remove" [ref=e159] [cursor=pointer]
+            - generic [ref=e164]:
+              - text: Nothing on the build surface yet.
+              - text: Plan an idea, apply a template, or add one relevant tool.
+              - generic [ref=e165]:
+                - button "Plan idea" [ref=e166] [cursor=pointer]
+                - button "Apply starter" [ref=e167] [cursor=pointer]
+          - generic [ref=e169]:
+            - generic [ref=e170]:
+              - generic [ref=e171]: Foundry off
+              - heading "Foundry is off" [level=3] [ref=e172]
+              - paragraph [ref=e173]: Local Tutor, Builder, and Interaction agents are guiding this prototype. No Foundry account, API call, or token spend is used here.
+              - generic [ref=e174]:
+                - generic [ref=e175]: Local-only mode
+                - generic [ref=e176]: Prototype memory
+            - generic [ref=e177]:
+              - generic [ref=e178]: Local agents
+              - heading "Action layer" [level=3] [ref=e179]
+              - paragraph [ref=e180]: Planner, Builder, Interaction, Test, and Tutor agents change the local prototype and keep each next step small.
+    - complementary "Inspector and AI guide" [ref=e181]:
+      - generic [ref=e182]:
+        - heading "Inspector" [level=2] [ref=e183]
+        - generic [ref=e184]:
+          - button "-" [ref=e185] [cursor=pointer]
+          - button "+" [ref=e186] [cursor=pointer]
+          - generic [ref=e187]: none
+          - button "-" [ref=e188] [cursor=pointer]
+      - generic [ref=e189]:
+        - generic [ref=e190]:
+          - generic [ref=e191]:
+            - text: Nothing selected yet.
+            - text: Click a block in the Build Space. Its editable fields will appear here.
+          - button "Select first block" [ref=e192] [cursor=pointer]
+        - generic [ref=e193]:
+          - heading "AI Guide" [level=3] [ref=e194]
+          - paragraph [ref=e195]: Start with an idea. The next useful action is to create a KISS plan.
+          - paragraph [ref=e198]: "confidence: 72 percent"
+        - generic [ref=e199]:
+          - heading "Local Agents" [level=3] [ref=e200]
+          - generic [ref=e201]:
+            - generic [ref=e202]:
+              - generic [ref=e203]: Local
+              - heading "Planner Agent" [level=3] [ref=e204]
+              - paragraph [ref=e205]: Turns the goal into a small KISS plan and hides unrelated tools.
+            - generic [ref=e206]:
+              - generic [ref=e207]: Local
+              - heading "Builder Agent" [level=3] [ref=e208]
+              - paragraph [ref=e209]: Adds components, keeps the canvas readable, and points to the next edit.
+            - generic [ref=e210]:
+              - generic [ref=e211]: Local
+              - heading "Interaction Agent" [level=3] [ref=e212]
+              - paragraph [ref=e213]: Connects clicks, inputs, and commands into simple when-this-then-that flows.
+            - generic [ref=e214]:
+              - generic [ref=e215]: Local
+              - heading "Test Agent" [level=3] [ref=e216]
+              - paragraph [ref=e217]: Runs prototype checks and tells the user what is still missing.
+            - generic [ref=e218]:
+              - generic [ref=e219]: Local
+              - heading "Tutor Agent" [level=3] [ref=e220]
+              - paragraph [ref=e221]: Explains one beginner action at a time without requiring code vocabulary.
+        - generic [ref=e222]:
+          - heading "Foundry IQ Mock" [level=3] [ref=e223]
+          - generic [ref=e224]: off - 0 tokens
+          - paragraph [ref=e225]:
+            - strong [ref=e226]: Foundry is off
+            - text: Local Tutor, Builder, and Interaction agents are guiding this prototype. No Foundry account, API call, or token spend is used here.
+          - generic [ref=e227]:
+            - generic [ref=e228]: Local-only mode
+            - generic [ref=e229]: Prototype memory
+        - generic [ref=e230]:
+          - heading "Web Style" [level=3] [ref=e231]
+          - paragraph [ref=e232]: These controls change the page you are building, not the studio chrome.
+          - generic [ref=e233]:
+            - generic [ref=e234]:
+              - generic [ref=e235]:
+                - checkbox "Keep cards and buttons uniform" [checked] [ref=e236]
+                - text: Keep cards and buttons uniform
+              - paragraph [ref=e237]: Turn this off to style the selected card, panel, or button individually in the Inspector.
+            - generic [ref=e238]:
+              - generic [ref=e239]: Font
+              - combobox "Font" [ref=e240]:
+                - option "Clean app font" [selected]
+                - option "Editorial serif"
+                - option "Friendly rounded"
+                - option "Code / terminal"
+            - generic [ref=e241]:
+              - generic [ref=e242]: Page
+              - textbox "Page" [ref=e243]: "#f7f0df"
+            - generic [ref=e244]:
+              - generic [ref=e245]: Text
+              - textbox "Text" [ref=e246]: "#24190d"
+            - generic [ref=e247]:
+              - generic [ref=e248]: Cards
+              - textbox "Cards" [ref=e249]: "#fffaf0"
+            - generic [ref=e250]:
+              - generic [ref=e251]: Borders
+              - textbox "Borders" [ref=e252]: "#d7b16a"
+            - generic [ref=e253]:
+              - generic [ref=e254]: Button
+              - textbox "Button" [ref=e255]: "#f4b94e"
+            - generic [ref=e256]:
+              - generic [ref=e257]: Button text
+              - textbox "Button text" [ref=e258]: "#171006"
+        - generic [ref=e259]:
+          - generic [ref=e260]:
+            - generic [ref=e261]: Audit trail
+            - button "Clear" [ref=e262] [cursor=pointer]
+          - generic [ref=e264]: No actions yet.
+    - region "Smart terminal" [ref=e265]:
+      - generic [ref=e266]:
+        - heading "AI Chat + Smart Terminal" [level=2] [ref=e267]
+        - generic [ref=e268]:
+          - generic [ref=e269]: sandbox only
+          - generic [ref=e270]: /
+          - button "-" [ref=e271] [cursor=pointer]
+      - generic [ref=e272]:
+        - generic [ref=e273]:
+          - generic [ref=e275]: No questions or commands yet. Try help, mkdir project, or How do I edit text?
+          - generic [ref=e276]:
+            - generic [ref=e277]: / $
+            - 'textbox "ask anything, or try: help, mkdir project, scaffold webpage" [ref=e278]'
+            - button "Ask / Run" [ref=e279] [cursor=pointer]
+        - generic [ref=e280]:
+          - generic [ref=e281]: Sandbox filesystem
+          - generic [ref=e282]: / project/ README.md
+          - generic [ref=e283]: Ask questions here when stuck. Safe commands are simulated; local assistant answers do not call Foundry.

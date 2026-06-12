@@ -50,9 +50,9 @@ Every agent step — prompt, grounding citations, output, model tier — is appe
 
 Three views over the same engine: **Assistant** (chat + model compare), **Project Ops** (board, scope gate, Context ROI Coach, evidence-seeded Popsicle Index, health radar, memo inbox, .ics calendar export), **Creative Studio** (creative chat that creates *and* edits projects by talking, vision board, governed asset gallery). Onboard any folder on your machine into KISS with two clicks — existing files are never modified.
 
-## Roadmap glimpse
+## Companion submission: Builder Studio
 
-`command-center/builder-studio-prototype.html` — a standalone prototype of the next stage: a visual Builder Studio (Plan → Build → Code → Test → Export) that will sit behind the same scope gate and Asset Governor. Not yet wired to the engine; included as a direction marker.
+`builder-studio/` — a visual builder (Plan → Build → Code → Test → Export) wired to this same engine: cited planning guidance (Foundry IQ), scope validation on canvas work (Fabric IQ rules), project-context chat. One engine, two surfaces — see `builder-studio/README.md`.
 
 ## Why this is different
 

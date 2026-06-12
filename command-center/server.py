@@ -464,6 +464,7 @@ class H(BaseHTTPRequestHandler):
     def _json(self, obj, code=200):
         body = json.dumps(obj, ensure_ascii=False).encode()
         self.send_response(code)
+        self.send_header("Access-Control-Allow-Origin", "*")
         self.send_header("Content-Type", "application/json; charset=utf-8")
         self.send_header("Content-Length", str(len(body)))
         self.end_headers()
@@ -488,6 +489,8 @@ class H(BaseHTTPRequestHandler):
         }
         if u.path == "/":
             self._file(HERE / "index.html", "text/html; charset=utf-8")
+        elif u.path == "/builder":
+            self._file(ROOT / "builder-studio" / "index.html", "text/html; charset=utf-8")
         elif u.path.startswith("/assets/"):
             f = (HERE / u.path.lstrip("/")).resolve()
             if f.is_file() and HERE in f.parents:

@@ -508,6 +508,11 @@ class H(BaseHTTPRequestHandler):
             self.wfile.write(body)
         elif u.path == "/api/traces":
             self._json(traces(qs.get("q", [""])[0]))
+        elif u.path == "/api/query":
+            from query import explore
+            rows = explore(qs.get("q", [""])[0],
+                           qs.get("source", [None])[0] or None)
+            self._json(rows[-60:])
         elif u.path == "/api/vision":
             self._json({"svg": read(proj() / "vision" / "vision_board.svg")})
         elif u.path in routes:

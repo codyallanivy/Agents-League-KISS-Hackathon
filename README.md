@@ -56,4 +56,4 @@ Token trackers measure what you *already spent*. KISS estimates context cost **b
 
 ## Repo map
 
-`foundry-track2/` engine + IQ layers + evals · `command-center/` dashboard · `creative-track1/` campaign studio + asset governor + vision layer · `m365-track3/` declarative agent + cards + Teams mock · `demo-project/` seeded synthetic projects · `cli-skill/` Track 1 CLI origin · `GAP_ANALYSIS.md` living decision log
+`foundry-track2/` engine + IQ layers + evals · `command-center/` dashboard · `creative-track1/` campaign studio + asset governor + vision layer · `m365-track3/` declarative agent + cards + Teams mock · `demo-project/` seeded synthetic projects · `cli-skill/` Track 1 CLI origin · `docs/` demo script, judges brief, planning history · `GAP_ANALYSIS.md` living decision log

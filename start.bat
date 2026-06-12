@@ -23,10 +23,11 @@ echo.
 echo    [1] Command Center dashboard  (recommended)
 echo    [2] Track 2 reasoning demo    (terminal)
 echo    [3] Campaign Studio           (D&D demo)
-echo    [4] Vision board for pizza-shop
+echo    [4] Vision board for creator-launch
 echo    [5] Teams governance mock     (browser)
+echo    [6] Builder Studio            (submission #2, IQ-connected)
 echo.
-set /p choice="  Pick 1-5 and press Enter [1]: "
+set /p choice="  Pick 1-6 and press Enter [1]: "
 if "%choice%"=="" set choice=1
 
 if "%choice%"=="1" (
@@ -48,14 +49,20 @@ if "%choice%"=="1" (
     pause
 ) else if "%choice%"=="4" (
     cd creative-track1
-    python visualize.py ..\demo-project\pizza-shop
-    start "" "..\demo-project\pizza-shop\vision\vision_board.svg"
+    python visualize.py ..\demo-project\creator-launch
+    start "" "..\demo-project\creator-launch\vision\vision_board.svg"
     pause
 ) else if "%choice%"=="5" (
     cd m365-track3\mock-ui
     python build_mock.py
     start "" teams-mock.html
     pause
+) else if "%choice%"=="6" (
+    echo.
+    echo  Starting engine + Builder Studio at http://localhost:8765/builder ...
+    start "" http://localhost:8765/builder
+    cd command-center
+    python server.py
 ) else (
     echo  Unknown choice.
     pause

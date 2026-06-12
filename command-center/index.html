@@ -158,26 +158,29 @@
 </div>
 
 <div class="view" id="v3">
-  <div class="grid">
-    <div class="panel col-span">
-      <h2>✨ Survey Me Now — new project, any kind</h2>
-      <div class="row"><input id="s_idea" placeholder="what are you building? (a campaign, a brand, an app, a course… anything)"><button onclick="getSurvey()">Survey me</button></div>
+  <div class="grid" style="grid-template-columns:1.1fr 1fr">
+    <div class="panel" style="display:flex;flex-direction:column;min-height:560px">
+      <h2>🎨 Creative Chat <span class="sub">— create &amp; edit your project by talking · <span id="ccproj"></span></span></h2>
+      <div id="cclog" style="flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:8px">
+        <div class="msg ai">Tell me what you're building ("survey me: a coffee shop brand") and I'll interview you.
+Or just talk about the active project — I can read its files — and say things like "make act 2 darker" or "rewrite the premise" to edit the creation document directly.</div>
+      </div>
       <div id="s_qs"></div>
-      <p class="hint" id="surveyout">Tell it the idea — the intake questions adapt to what you're building. Answers become KISS files; the look &amp; feel answer drives every palette.</p>
+      <div class="row" style="margin-top:10px"><input id="ccin" placeholder='try "survey me: …" or "change the ending to…"'><button onclick="ccSend()">Send</button></div>
+      <p class="hint" id="surveyout">survey me → tailored intake · edit/change/rewrite → updates the creation doc (previous kept) · anything else → file-grounded chat</p>
     </div>
-    <div class="panel col-span">
+    <div class="panel" style="min-height:560px">
       <h2>Vision Board <span class="sub">(docs → visual understanding)</span></h2>
       <div id="visionwrap3"><p class="hint">no vision board yet for this project</p></div>
-      <div class="row" style="margin-top:10px"><button onclick="genVision()">⟳ Regenerate vision board (governed)</button><span class="sub" id="visout" style="align-self:center"></span></div>
+      <div class="row" style="margin-top:10px"><button onclick="genVision()">⟳ Regenerate (governed)</button><span class="sub" id="visout" style="align-self:center"></span></div>
     </div>
     <div class="panel col-span">
       <h2>Asset Gallery <span class="sub" id="galleryproj"></span></h2>
       <div class="gallery" id="gallery"></div>
-      <p class="hint" style="margin-top:10px">New campaign: run <b>start.bat → option 3</b> (or `python campaign_studio.py` for a custom survey). Every asset passed the Asset Governor — policy, budget, and verification queue in creative-track1/templates/ASSET_POLICY.md.</p>
+      <p class="hint" style="margin-top:10px">✏️ AI on any asset edits it in place (governed, original kept). Offline art is deterministic by design — same files, same art; model tiers add variation. The chat reads these SVGs too.</p>
     </div>
   </div>
 </div>
-
 <div id="bmodal" style="display:none;position:fixed;inset:0;background:rgba(5,8,14,.8);z-index:50;align-items:center;justify-content:center">
   <div style="background:var(--panel);border:1px solid var(--gold);border-radius:12px;width:520px;max-width:92vw;padding:16px">
     <h2 style="font-size:12px;letter-spacing:2px;color:var(--gold);margin-bottom:8px">FIND YOUR PROJECT FOLDER</h2>
@@ -199,7 +202,7 @@ let ACTIVE = "";
 function tab(v){
   document.querySelectorAll(".tab").forEach(t=>t.classList.toggle("on", t.dataset.v===v));
   document.querySelectorAll(".view").forEach(x=>x.classList.toggle("on", x.id===v));
-  if(v==="v3"){ loadGallery(); loadVision(); }
+  if(v==="v3"){ loadGallery(); loadVision(); $("ccproj").textContent = ACTIVE; }
 }
 async function safe(fn){ try{ await fn(); }catch(e){ console.warn(fn.name, e); } }
 async function status(){
@@ -370,7 +373,7 @@ async function loadGallery(){
   const a = await (await fetch("/api/assets")).json();
   $("gallery").innerHTML = a.map(u=>{
     const rel = decodeURIComponent(u.split("p=")[1]);
-    return `<div style="position:relative"><img src="${u}" title="${esc(rel)}">
+    return `<div style="position:relative"><img src="${u}&t=${Date.now()}" title="${esc(rel)}">
       <button onclick="editAsset('${esc(rel)}')" title="Edit with AI (governed)" style="position:absolute;top:6px;right:6px;padding:3px 8px;font-size:11px">✏️ AI</button></div>`;
   }).join("") || '<p class="hint">no assets yet — use Survey Me Now above</p>';
 }
@@ -381,12 +384,21 @@ async function editAsset(rel){
   if(r.error){ alert(r.error); return; }
   loadGallery(); alert("Edited ✓ saved as " + r.new + " (original kept; new version queued for verification)");
 }
-let SQS = [];
-async function getSurvey(){
-  const idea = $("s_idea").value.trim();
-  if(!idea){ alert("Describe what you're building first."); return; }
-  $("surveyout").textContent = "writing your intake questions…";
-  const r = await (await fetch("/api/survey-questions",{method:"POST",body:JSON.stringify({idea})})).json();
+let SQS = [], CCIDEA = "";
+function ccAdd(cls, text){ $("cclog").insertAdjacentHTML("beforeend", `<div class="msg ${cls}">${esc(text)}</div>`); $("cclog").scrollTop = 1e9; }
+async function ccSend(){
+  const v = $("ccin").value.trim(); if(!v) return; $("ccin").value = "";
+  ccAdd("me", v); ccAdd("ai hint", "thinking…");
+  try{
+    const r = await (await fetch("/api/creative-chat",{method:"POST",body:JSON.stringify({message:v})})).json();
+    $("cclog").lastElementChild.remove();
+    if(r.questions){ CCIDEA = v; renderQs(r); ccAdd("ai", "A few questions so the project fits your idea — answer below and hit Generate."); return; }
+    ccAdd("ai", r.answer || r.error || JSON.stringify(r));
+    if(r.type === "edited"){ loadVision(); loadGallery(); }
+    loadTraces();
+  }catch(e){ $("cclog").lastElementChild.remove(); ccAdd("ai", "request failed: " + e); }
+}
+function renderQs(r){
   SQS = r.questions;
   $("s_qs").innerHTML = SQS.map((q,i)=>
     `<div class="pop-q">${esc(q.q)}</div><input id="sq${i}" placeholder="${esc(q.placeholder||"")}" style="width:100%;margin-bottom:4px">`).join("")
@@ -394,13 +406,15 @@ async function getSurvey(){
   $("surveyout").textContent = r.model === "offline" ? "(offline tier: generic KISS intake — connect a model for tailored questions)" : "questions tailored by " + r.model;
 }
 async function runSurvey(){
-  const body = { idea: $("s_idea").value.trim(),
+  const body = { idea: CCIDEA.replace(/^survey me[:,]? */i, ""),
     qa: SQS.map((q,i)=>({q: q.q, a: $("sq"+i).value.trim()})) };
   $("surveyout").textContent = "⚒ generating campaign + governed assets… (local models take a few minutes)";
   try{
     const r = await (await fetch("/api/campaign",{method:"POST",body:JSON.stringify(body)})).json();
     if(r.error){ $("surveyout").textContent = "failed: " + r.error; return; }
-    $("surveyout").textContent = `✓ '${r.title}' generated — ${r.words} words · ${r.governance.length} asset checks · now active`;
+    $("surveyout").textContent = `✓ '${r.title}' — ${r.words} words · ${r.governance.length} asset checks`;
+    $("s_qs").innerHTML = "";
+    ccAdd("ai", `✓ '${r.title}' generated and now active — ${r.words} words, ${r.governance.length} governed asset checks. Ask me about it or tell me what to change.`);
     ACTIVE = r.active; refresh();
   }catch(e){ $("surveyout").textContent = "failed: " + e; }
 }
@@ -409,6 +423,7 @@ $("heroin").addEventListener("keydown",e=>{if(e.key==="Enter")heroSend();});
 $("scopein").addEventListener("keydown",e=>{if(e.key==="Enter")scope();});
 $("tracein").addEventListener("keydown",e=>{if(e.key==="Enter")loadTraces();});
 $("memoin").addEventListener("keydown",e=>{if(e.key==="Enter")addMemo();});
+if($("ccin")) $("ccin").addEventListener("keydown",e=>{if(e.key==="Enter")ccSend();});
 (async()=>{ await safe(status); refresh(); })();
 </script>
 </body>

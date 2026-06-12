@@ -23,6 +23,8 @@ class FoundryIQ:
 
     def _index_file(self, path: Path):
         text = path.read_text(encoding="utf-8", errors="replace")
+        # source includes the parent folder so projects never blur together
+        self._src = f"{path.parent.name}/{path.name}" if path.parent.name not in ("knowledge",) else path.name
         heading = path.name
         buf = []
         for line in text.splitlines():
@@ -35,6 +37,7 @@ class FoundryIQ:
         self._flush(path.name, heading, buf)
 
     def _flush(self, source, heading, buf):
+        source = getattr(self, "_src", source)
         body = "\n".join(buf).strip()
         if body:
             self.chunks.append({"source": source, "heading": heading, "text": body})

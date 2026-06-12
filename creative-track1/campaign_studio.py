@@ -172,7 +172,7 @@ def template_campaign(a, title, npcs, rng):
     return "\n".join(md)
 
 
-def svg_asset(kind, label, pal, path, seed=""):
+def svg_asset(kind, label, pal, path, seed="", fantasy=True):
     """Layered, art-directed SVG compositions (offline tier)."""
     deep, accent, mid, light = pal
     rng = random.Random(seed + kind + label)
@@ -203,8 +203,11 @@ def svg_asset(kind, label, pal, path, seed=""):
                 f'<path d="M118 298 q4 -82 36 -118" stroke="{accent}" stroke-width="2.4" fill="none" opacity="0.85"/>'
                 f'<circle cx="246" cy="106" r="4" fill="{accent}"/>')
     elif kind == "map":
+        poi_labels = ([(120, 95, "Drowned Shrine"), (236, 150, "Greyharbor"), (96, 208, "Gull Point"), (300, 90, "the Wreck")]
+                      if fantasy else
+                      [(120, 95, "Phase 1"), (236, 150, "Core"), (96, 208, "Phase 2"), (300, 90, "Later")])
         pois = "".join(f'<g><circle cx="{x}" cy="{y}" r="5.5" fill="{accent}"/><circle cx="{x}" cy="{y}" r="9" fill="none" stroke="{accent}" stroke-width="1" opacity="0.5"/><text x="{x + 13}" y="{y + 4}" font-size="11" font-family="Georgia" fill="{deep}">{t}</text></g>'
-                       for x, y, t in [(120, 95, "Drowned Shrine"), (236, 150, "Greyharbor"), (96, 208, "Gull Point"), (300, 90, "the Wreck")])
+                       for x, y, t in poi_labels)
         body = (f'<rect width="400" height="300" fill="{light}"/>'
                 f'<rect x="8" y="8" width="384" height="284" fill="none" stroke="{deep}" stroke-width="2" opacity="0.6"/>'
                 f'<rect x="13" y="13" width="374" height="274" fill="none" stroke="{deep}" stroke-width="0.8" opacity="0.5"/>'
@@ -213,7 +216,7 @@ def svg_asset(kind, label, pal, path, seed=""):
                 f'<path d="M60 240 q60 -30 120 -10" stroke="{deep}" stroke-width="1.4" stroke-dasharray="5 4" fill="none"/>'
                 f'{pois}'
                 f'<g transform="translate(350,245)"><circle r="16" fill="none" stroke="{deep}" stroke-width="1.6"/><path d="M0 -14 L4 0 L0 14 L-4 0 Z" fill="{accent}"/><text x="-4" y="-20" font-size="11" font-family="Georgia" fill="{deep}">N</text></g>'
-                f'<text x="20" y="282" font-size="10.5" font-family="Georgia" font-style="italic" fill="{deep}" opacity="0.85">shadowed regions = blockers · dotted route = current sprint · horizon = deadline</text>')
+                + (f'<text x="20" y="282" font-size="10.5" font-family="Georgia" font-style="italic" fill="{deep}" opacity="0.85">shadowed regions = blockers · dotted route = current sprint · horizon = deadline</text>' if fantasy else ""))
     else:  # title-card
         body = (f'<rect width="400" height="300" fill="url(#sky)"/>{stars}'
                 f'<ellipse cx="200" cy="160" rx="170" ry="70" fill="url(#glow)" opacity="0.6"/>'

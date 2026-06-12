@@ -79,6 +79,7 @@
   <span class="badge b-offline" id="modelbadge">…</span>
   <select id="modelsel" onchange="switchModel(this.value)"></select>
   <select id="projsel" onchange="switchProject(this.value)"></select>
+  <button onclick="newProject()" title="Start a blank KISS project" style="padding:5px 10px;font-size:12px">✚ new</button>
   <button onclick="addProject()" title="Add a project folder the scanner did not find" style="padding:5px 10px;font-size:12px">+ folder</button>
   <span class="sub" id="statusline"></span>
 </header>
@@ -182,7 +183,11 @@ Or just talk about the active project — I can read its files — and say thing
       <div class="row" style="margin-top:10px"><button onclick="genVision()">⟳ Regenerate (governed)</button><span class="sub" id="visout" style="align-self:center"></span></div>
     </div>
     <div class="panel col-span">
-      <h2>Asset Gallery <span class="sub" id="galleryproj"></span></h2>
+      <h2>Asset Gallery <span class="sub" id="galleryproj"></span>
+        <span style="float:right">
+          <button onclick="addAsset()" style="padding:3px 10px;font-size:11px" title="Generate one more asset (governed)">➕ asset</button>
+          <button onclick="verifyAssets()" style="padding:3px 10px;font-size:11px" id="verifybtn" title="Mark everything in the gallery as human-reviewed">✓ mark reviewed</button>
+        </span></h2>
       <div class="gallery" id="gallery"></div>
       <p class="hint" style="margin-top:10px">✏️ AI on any asset edits it in place (governed, original kept). Offline art is deterministic by design — same files, same art; model tiers add variation. The chat reads these SVGs too.</p>
     </div>
@@ -292,11 +297,13 @@ async function compareModels(){
   const r = await (await fetch("/api/compare",{method:"POST",body:JSON.stringify({message:v})})).json();
   $("herolog").lastElementChild.remove();
   const tierColor = m => m.startsWith("foundry") ? "#7ab8ff" : m.startsWith("ollama") ? "var(--good)" : "var(--dim)";
-  const cols = r.results.map(x =>
+  window.LASTCMP = {prompt: v, results: r.results};
+  const cols = r.results.map((x,i) =>
     `<div style="flex:1;min-width:200px;background:#0e1726;border-top:3px solid ${tierColor(x.mode)};border-radius:8px;padding:10px">
        <div style="font-size:11px;letter-spacing:1.5px;color:${tierColor(x.mode)};margin-bottom:6px">${esc(x.mode.toUpperCase())} · ${x.seconds}s</div>
        <div style="font-size:12px;line-height:1.55;white-space:pre-wrap">${esc(x.answer)}</div>
        ${x.cites.length?`<div class="cite">${esc(x.cites.join(" · "))}</div>`:""}
+       <button onclick="prefer(${i})" style="margin-top:8px;padding:3px 10px;font-size:11px" title="Save as a preference pair for future fine-tuning">👍 prefer this</button>
      </div>`).join("");
   $("herolog").insertAdjacentHTML("beforeend", `<div style="display:flex;gap:10px;flex-wrap:wrap">${cols}</div>`);
   $("herolog").scrollTop = 1e9; loadTraces();
@@ -396,7 +403,31 @@ async function genVision(){
   if(!r.ok) alert("Vision board generation failed:\n\n" + (r.out || "no output"));
   loadVision(); loadGallery();
 }
+async function newProject(){
+  const name = prompt("Name the new project:");
+  if(!name) return;
+  const r = await (await fetch("/api/new-project",{method:"POST",body:JSON.stringify({name})})).json();
+  if(r.error){ alert(r.error); return; }
+  ACTIVE = r.active; refresh();
+  alert("Project '" + r.active + "' created with the KISS memory files — set its vision tiers, then build.");
+}
+async function addAsset(){
+  const kind = prompt("Asset type — cover, portrait, map, or title-card:", "cover");
+  if(!kind) return;
+  const p = prompt("Describe it (one line):", "");
+  if(p === null) return;
+  const r = await (await fetch("/api/add-asset",{method:"POST",body:JSON.stringify({kind:kind.trim(), prompt:p})})).json();
+  if(r.error){ alert(r.error); return; }
+  loadGallery(); loadHealth();
+}
+async function verifyAssets(){
+  const r = await (await fetch("/api/verify-assets",{method:"POST",body:"{}"})).json();
+  alert("✓ " + r.verified + " item(s) marked reviewed — verification debt cleared, logged to ITERATION_LOG.");
+  loadGallery(); loadHealth(); loadNext(); loadPop();
+}
 async function loadGallery(){
+  try{ const h = await (await fetch("/api/health")).json();
+       $("verifybtn").textContent = h.unverified > 0 ? `✓ mark reviewed (${h.unverified})` : "✓ all reviewed"; }catch(e){}
   const a = await (await fetch("/api/assets")).json();
   $("gallery").innerHTML = a.map(u=>{
     const rel = decodeURIComponent(u.split("p=")[1]);
@@ -451,6 +482,13 @@ $("scopein").addEventListener("keydown",e=>{if(e.key==="Enter")scope();});
 $("tracein").addEventListener("keydown",e=>{if(e.key==="Enter")loadTraces();});
 $("memoin").addEventListener("keydown",e=>{if(e.key==="Enter")addMemo();});
 if($("ccin")) $("ccin").addEventListener("keydown",e=>{if(e.key==="Enter")ccSend();});
+async function prefer(i){
+  const c = window.LASTCMP; if(!c) return;
+  const chosen = c.results[i];
+  const rejected = c.results.filter((_,j)=>j!==i).map(x=>({mode:x.mode, answer:x.answer}));
+  const r = await (await fetch("/api/prefer",{method:"POST",body:JSON.stringify({prompt:c.prompt, chosen:{mode:chosen.mode, answer:chosen.answer}, rejected})})).json();
+  alert("👍 saved — preference dataset now has " + r.dataset_pairs + " pair(s) (traces/preferences.jsonl, fine-tuning-ready format)");
+}
 (async()=>{ await safe(status); refresh(); })();
 </script>
 </body>

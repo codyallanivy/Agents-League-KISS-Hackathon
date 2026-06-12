@@ -6,3 +6,4 @@ __pycache__/
 *.pyc
 .DS_Store
 command-center/projects.json
+foundry-track2/traces/preferences.jsonl

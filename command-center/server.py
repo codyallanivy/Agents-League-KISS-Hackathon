@@ -273,7 +273,11 @@ def traces(q=""):
 def chat(message, file_context=""):
     grounding = CTX.foundry_iq.retrieve(message)
     if file_context:
-        grounding = [{"citation": f"{ACTIVE} project files (live)", "snippet": file_context[:1200]}] + grounding[:3]
+        # project-only grounding: drop chunks from other projects/domains so
+        # e.g. a coffee brand never inherits fantasy-campaign flavor
+        own = [g for g in grounding if g["citation"].startswith(ACTIVE + "/")]
+        grounding = [{"citation": f"{ACTIVE} project files (live)",
+                      "snippet": file_context[:1200]}] + own[:3]
     system = ("You are the KISS Agile coach. Answer from the cited project knowledge; "
               "protect scope; be concise and warm. Cite sources in [brackets].")
     cites = "\n\n".join(f"[{g['citation']}]\n{g['snippet']}" for g in grounding) or "(none)"
@@ -621,6 +625,67 @@ class H(BaseHTTPRequestHandler):
         elif self.path == "/api/todo":
             ok = toggle_todo(data.get("line", ""), data.get("done", True))
             self._json({"ok": ok, **board()})
+        elif self.path == "/api/new-project":
+            name = re.sub(r"[^a-zA-Z0-9 _-]", "", data.get("name", "")).strip()
+            if not name:
+                self._json({"error": "give the project a name"}, 400)
+            else:
+                d = ROOT / "creative-track1" / "output" / name.lower().replace(" ", "-")
+                d.mkdir(parents=True, exist_ok=True)
+                created = scaffold_kiss(d)
+                PROJECTS = globals()["PROJECTS"]
+                PROJECTS[d.name] = d
+                for f in sorted(d.rglob("*.md")):
+                    CTX.foundry_iq._index_file(f)
+                ACTIVE = d.name
+                globals()["ACTIVE"] = d.name
+                self._json({"active": d.name, "created": created, "projects": list(PROJECTS)})
+        elif self.path == "/api/add-asset":
+            kind = data.get("kind", "cover")
+            prompt_txt = data.get("prompt", "").strip() or kind
+            from asset_governor import AssetGovernor as _AG
+            import campaign_studio as cs
+            gov = _AG(proj())
+            d = gov.check(kind if kind in ("cover", "portrait", "map", "title-card") else "cover",
+                          prompt_txt)
+            if d["verdict"] == "BLOCK":
+                gov.park(kind, prompt_txt, d["reasons"])
+                self._json({"error": "Governor: BLOCK — " + "; ".join(d["reasons"])}, 400)
+            else:
+                ad = art_direction()
+                pal = cs.PALETTES.get(ad["tone"], cs.PALETTES["heroic"])
+                (proj() / "assets").mkdir(exist_ok=True)
+                n = 1
+                while (proj() / "assets" / f"{kind}-{n}.svg").exists():
+                    n += 1
+                p = proj() / "assets" / f"{kind}-{n}.svg"
+                cs.svg_asset(kind, prompt_txt[:36], pal, p, seed=ACTIVE + prompt_txt,
+                             fantasy=False)
+                gov.record_generation(kind, p.name, d["estimated_cost_usd"])
+                self._json({"ok": True, "file": p.name, "verdict": d["verdict"],
+                            "note": d["reasons"][0] if d["reasons"] else ""})
+        elif self.path == "/api/verify-assets":
+            pv = proj() / "PENDING_VERIFICATION.md"
+            n = 0
+            if pv.exists():
+                txt = pv.read_text(encoding="utf-8")
+                n = txt.count("- [ ]")
+                pv.write_text(txt.replace("- [ ]", "- [x]"), encoding="utf-8")
+                with open(proj() / "ITERATION_LOG.md", "a", encoding="utf-8") as fh:
+                    fh.write(f"\n## {time.strftime('%Y-%m-%d %H:%M')} — verification session\n"
+                             f"{n} assets reviewed and marked verified via gallery.\n")
+            self._json({"verified": n})
+        elif self.path == "/api/prefer":
+            pref = {"ts": time.strftime("%Y-%m-%dT%H:%M:%S"),
+                    "prompt": data.get("prompt", ""),
+                    "chosen": data.get("chosen", {}),
+                    "rejected": data.get("rejected", []),
+                    "project": ACTIVE}
+            pf = T2 / "traces" / "preferences.jsonl"
+            with open(pf, "a", encoding="utf-8") as fh:
+                fh.write(json.dumps(pref, ensure_ascii=False) + "\n")
+            count = sum(1 for _ in open(pf, encoding="utf-8"))
+            self._json({"ok": True, "dataset_pairs": count})
         elif self.path == "/api/compare":
             msg = data.get("message", "").strip()
             modes = data.get("modes") or model_options()
@@ -656,8 +721,10 @@ class H(BaseHTTPRequestHandler):
                 assets_list = ", ".join(Path(a.split("p=")[1]).name for a in assets()) or "none"
                 raw = CTX.model.complete(
                     "You are the project's creative editor. Apply the user's instruction to "
-                    "the creation document. Stay true to the project's tone and scope; "
-                    "original content only, PG-13. Return ONLY the complete updated "
+                    "the creation document. Stay true to THIS project's domain, tone and "
+                    "vocabulary — do not import fantasy/RPG tropes, mythic flavor, or other "
+                    "projects' content unless this project is itself a game or campaign. "
+                    "Original content only, PG-13. Return ONLY the complete updated "
                     "Markdown document, no commentary.",
                     f"PROJECT: tone={ad['tone']}; about: {ad['goal']}\n"
                     f"EXISTING ASSETS: {assets_list}\n\nINSTRUCTION: {msg}\n\n"
@@ -717,6 +784,8 @@ class H(BaseHTTPRequestHandler):
                         "You are a creative director and planner. Produce the primary "
                         "creation document for this project (whatever fits: campaign, "
                         "brand kit, product concept, lesson plan, event plan...). "
+                        "Write in THIS project's own domain and vocabulary — no fantasy/RPG "
+                        "tropes or mythic flavor unless the idea is itself a game/campaign. "
                         "Original content only, PG-13. Clean Markdown, 600-1000 words, "
                         "ending with '## Next Steps' (3 bullets).",
                         f"IDEA: {idea}\n\nINTAKE ANSWERS:\n{qa_lines}")
@@ -740,10 +809,30 @@ class H(BaseHTTPRequestHandler):
             (out / "assets").mkdir(exist_ok=True)
             log = []
             if idea:  # generic asset set — no campaign tropes
-                reqs = [("cover", title),
-                        ("map", "Project overview — " + title),
-                        ("title-card", title),
-                        ("title-card", a["must_have"][:36])]
+                reqs = None
+                if CTX.model.mode != "offline":
+                    rawp = CTX.model.complete(
+                        "You plan visual asset kits. Given a project idea, return EXACTLY a "
+                        "JSON array of 4-5 assets this KIND of project actually needs "
+                        "(brand → logo concept, palette card, social banner; app → icon, "
+                        "screen mockup; course → cover, lesson card; game → cover, map...). "
+                        'Each item: {"type": one of "cover"|"portrait"|"map"|"title-card", '
+                        '"label": short specific label}. JSON only.',
+                        "IDEA: " + idea[:300])
+                    try:
+                        s = rawp[rawp.index("["):rawp.rindex("]") + 1]
+                        plan = [p for p in json.loads(s)
+                                if isinstance(p, dict) and p.get("type") in
+                                ("cover", "portrait", "map", "title-card")][:5]
+                        if plan:
+                            reqs = [(p["type"], str(p.get("label", title))[:40]) for p in plan]
+                    except Exception:
+                        reqs = None
+                if not reqs:
+                    reqs = [("cover", title),
+                            ("map", "Project overview — " + title),
+                            ("title-card", title),
+                            ("title-card", a["must_have"][:36])]
             else:
                 reqs = ([("cover", title)] + [("portrait", f"{n} the {r}") for n, r, _m in npcs]
                         + [("map", "Region map"), ("title-card", f"Session One — {title}")])
@@ -752,7 +841,8 @@ class H(BaseHTTPRequestHandler):
                 log.append(f"{d['verdict']} {kind}: {prompt[:40]}")
                 if d["verdict"] == "ACCEPT":
                     p = out / "assets" / f"{kind}-{gov.counts.get(kind, 0) + 1}.svg"
-                    cs.svg_asset(kind, prompt[:36], pal, p, seed=a["title_seed"])
+                    cs.svg_asset(kind, prompt[:36], pal, p, seed=a["title_seed"],
+                                 fantasy=not bool(idea))
                     gov.record_generation(kind, p.name, d["estimated_cost_usd"])
             PROJECTS = discover_projects()
             PROJECTS.update(load_registry())

@@ -52,7 +52,9 @@ Three views over the same engine: **Assistant** (chat + model compare), **Projec
 
 ## Companion submission: Builder Studio
 
-`builder-studio/` — a visual builder (Plan → Build → Code → Test → Export) wired to this same engine: cited planning guidance (Foundry IQ), scope validation on canvas work (Fabric IQ rules), project-context chat. One engine, two surfaces — see `builder-studio/README.md`.
+`command-center/builder-studio-prototype.html` — the latest recovered visual builder prototype: Plan → Build → Code → Test → Export, CodeMirror code editing, selected-component styling, behavior editing, smart terminal, preview-only inspector, and local/Foundry mock controls. Run `start.bat` option 6 or open `http://localhost:8765/builder`.
+
+`builder-studio/` is preserved as the older IQ-connected demo at `http://localhost:8765/builder-iq` for cited planning guidance, scope validation, and project-context chat.
 
 ## Why this is different
 

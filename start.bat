@@ -25,8 +25,8 @@ echo    [2] Track 2 reasoning demo    (terminal)
 echo    [3] Campaign Studio           (D&D demo)
 echo    [4] Vision board for creator-launch
 echo    [5] Teams governance mock     (browser)
-echo    [6] Builder Studio            (submission #2, IQ-connected)
-echo    [7] Builder Studio prototype  (standalone recovery)
+echo    [6] Builder Studio            (latest recovered prototype)
+echo    [7] Builder Studio IQ demo    (engine-connected)
 echo.
 set /p choice="  Pick 1-7 and press Enter [1]: "
 if "%choice%"=="" set choice=1
@@ -60,16 +60,16 @@ if "%choice%"=="1" (
     pause
 ) else if "%choice%"=="6" (
     echo.
-    echo  Starting engine + Builder Studio at http://localhost:8765/builder ...
+    echo  Starting Builder Studio at http://localhost:8765/builder ...
     start "" http://localhost:8765/builder
     cd command-center
     python server.py
 ) else if "%choice%"=="7" (
     echo.
-    echo  Starting standalone Builder Studio prototype at http://127.0.0.1:8771/builder-studio-prototype.html ...
-    start "" http://127.0.0.1:8771/builder-studio-prototype.html
+    echo  Starting IQ-connected Builder Studio demo at http://localhost:8765/builder-iq ...
+    start "" http://localhost:8765/builder-iq
     cd command-center
-    python -m http.server 8771 --bind 127.0.0.1
+    python server.py
 ) else (
     echo  Unknown choice.
     pause

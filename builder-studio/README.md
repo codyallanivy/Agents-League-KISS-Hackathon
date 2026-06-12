@@ -7,7 +7,7 @@
 
 ```
 start.bat → option 1        (starts the engine)
-open http://localhost:8765/builder
+open http://localhost:8765/builder-iq
 ```
 
 Also runs standalone (double-click `index.html`) — the IQ dock then reports the engine offline and the canvas still works.
@@ -29,7 +29,7 @@ Plan → Build → Code → Test → Export. The canvas, component inspector, te
 
 ## 90-second demo beats
 
-1. Open `/builder` — IQ pill reads the live model tier and active project
+1. Open `/builder-iq` — IQ pill reads the live model tier and active project
 2. Click **Plan with KISS** → cited guidance appears in the dock
 3. Type "add user accounts and payments" → **🛡 Validate scope** → WARN/BLOCK with the rule and the why
 4. Build the Tier-1 components on the canvas → Export

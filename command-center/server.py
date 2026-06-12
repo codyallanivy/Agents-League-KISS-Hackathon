@@ -490,6 +490,8 @@ class H(BaseHTTPRequestHandler):
         if u.path == "/":
             self._file(HERE / "index.html", "text/html; charset=utf-8")
         elif u.path == "/builder":
+            self._file(HERE / "builder-studio-prototype.html", "text/html; charset=utf-8")
+        elif u.path == "/builder-iq":
             self._file(ROOT / "builder-studio" / "index.html", "text/html; charset=utf-8")
         elif u.path.startswith("/assets/"):
             f = (HERE / u.path.lstrip("/")).resolve()

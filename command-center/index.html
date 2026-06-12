@@ -356,7 +356,8 @@ async function loadVision(){
 async function genVision(){
   $("visout").textContent = "generating (governed)…";
   const r = await (await fetch("/api/visualize",{method:"POST",body:"{}"})).json();
-  $("visout").textContent = r.ok ? "done ✓" : "failed — see server console";
+  $("visout").textContent = r.ok ? "done ✓" : "failed";
+  if(!r.ok) alert("Vision board generation failed:\n\n" + (r.out || "no output"));
   loadVision(); loadGallery();
 }
 async function loadGallery(){

@@ -562,9 +562,20 @@ class H(BaseHTTPRequestHandler):
             ok = toggle_todo(data.get("line", ""), data.get("done", True))
             self._json({"ok": ok, **board()})
         elif self.path == "/api/visualize":
-            r = subprocess.run([sys.executable, str(ROOT / "creative-track1" / "visualize.py"),
-                                str(proj())], capture_output=True, text=True, timeout=120)
-            self._json({"ok": r.returncode == 0, "out": (r.stdout + r.stderr)[-600:]})
+            import os
+            env = {**os.environ, "PYTHONIOENCODING": "utf-8", "PYTHONUTF8": "1"}
+            try:
+                r = subprocess.run([sys.executable, str(ROOT / "creative-track1" / "visualize.py"),
+                                    str(proj())], capture_output=True, text=True,
+                                   encoding="utf-8", errors="replace",
+                                   timeout=180, env=env,
+                                   cwd=str(ROOT / "creative-track1"))
+                out = (r.stdout or "") + (r.stderr or "")
+                ok = r.returncode == 0
+            except Exception as exc:
+                out, ok = f"{type(exc).__name__}: {exc}", False
+            print(("[visualize OK]\n" if ok else "[visualize FAILED]\n") + out[-800:], flush=True)
+            self._json({"ok": ok, "out": out[-800:]})
         else:
             self._json({"error": "not found"}, 404)
 

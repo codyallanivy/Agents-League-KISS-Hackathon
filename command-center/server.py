@@ -615,6 +615,24 @@ class H(BaseHTTPRequestHandler):
         elif self.path == "/api/todo":
             ok = toggle_todo(data.get("line", ""), data.get("done", True))
             self._json({"ok": ok, **board()})
+        elif self.path == "/api/compare":
+            msg = data.get("message", "").strip()
+            modes = data.get("modes") or model_options()
+            results, original = [], CTX.model.mode
+            for m in modes[:3]:
+                set_model(m)
+                t0 = time.time()
+                c = chat(msg)
+                results.append({"mode": CTX.model.mode,
+                                "answer": (c["answer"] or "")[:900],
+                                "seconds": round(time.time() - t0, 1),
+                                "cites": c.get("cites", [])})
+            set_model(original)
+            CTX.tracer.log(agent="CompareMode", model="multi",
+                           prompt={"system": "compare", "user": msg},
+                           output={"answer": f"compared {len(results)} tiers"},
+                           extra={"modes": [r["mode"] for r in results]})
+            self._json({"results": results})
         elif self.path == "/api/creative-chat":
             msg = data.get("message", "").strip()
             low = msg.lower()

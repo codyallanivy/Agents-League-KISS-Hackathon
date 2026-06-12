@@ -94,7 +94,7 @@
     <h2>What are we building today?</h2>
     <p>Local-first. Your files never leave this machine. The brain behind every answer is your own project memory.</p>
     <div id="herolog"></div>
-    <div class="row"><input id="heroin" placeholder="ask anything — or describe an idea…"><button onclick="heroSend()">Send</button></div>
+    <div class="row"><input id="heroin" placeholder="ask anything — or describe an idea…"><button onclick="heroSend()">Send</button><button onclick="compareModels()" title="Run this prompt through every model tier side by side">⚖ Compare</button></div>
     <div class="modes">
       <div class="mode" onclick="tab('v2')"><b>📋 Project planning mode</b><span>Run a real project with KISS discipline — board, scope gate, ROI, health, decisions.</span></div>
       <div class="mode" onclick="tab('v3')"><b>✨ Creative mode</b><span>Generate a campaign or assets for fun — same governance, more art.</span></div>
@@ -283,6 +283,24 @@ async function ask(input, logdiv){
 }
 const send = () => ask("chatin","chatlog");
 const heroSend = () => ask("heroin","herolog");
+async function compareModels(){
+  const v = $("heroin").value.trim(); if(!v){ alert("Type a prompt first."); return; }
+  $("heroin").value = "";
+  $("herolog").insertAdjacentHTML("beforeend", `<div class="msg me">⚖ compare: ${esc(v)}</div>`);
+  $("herolog").insertAdjacentHTML("beforeend", `<div class="msg ai hint">running the same prompt through every model tier… (local models take a while)</div>`);
+  $("herolog").scrollTop = 1e9;
+  const r = await (await fetch("/api/compare",{method:"POST",body:JSON.stringify({message:v})})).json();
+  $("herolog").lastElementChild.remove();
+  const tierColor = m => m.startsWith("foundry") ? "#7ab8ff" : m.startsWith("ollama") ? "var(--good)" : "var(--dim)";
+  const cols = r.results.map(x =>
+    `<div style="flex:1;min-width:200px;background:#0e1726;border-top:3px solid ${tierColor(x.mode)};border-radius:8px;padding:10px">
+       <div style="font-size:11px;letter-spacing:1.5px;color:${tierColor(x.mode)};margin-bottom:6px">${esc(x.mode.toUpperCase())} · ${x.seconds}s</div>
+       <div style="font-size:12px;line-height:1.55;white-space:pre-wrap">${esc(x.answer)}</div>
+       ${x.cites.length?`<div class="cite">${esc(x.cites.join(" · "))}</div>`:""}
+     </div>`).join("");
+  $("herolog").insertAdjacentHTML("beforeend", `<div style="display:flex;gap:10px;flex-wrap:wrap">${cols}</div>`);
+  $("herolog").scrollTop = 1e9; loadTraces();
+}
 
 async function scope(){
   const v = $("scopein").value.trim(); if(!v) return;

@@ -46,6 +46,17 @@ class ModelClient:
             except Exception as exc:  # missing SDK, no az login, quota, etc.
                 print(f"[warn] Foundry unavailable ({type(exc).__name__}: {exc}) — offline reasoning mode.")
 
+        # Foundry tier, simple flavor: plain Azure OpenAI endpoint + key
+        if not self._openai and os.getenv("AZURE_OPENAI_ENDPOINT", "").strip():
+            try:
+                from openai import AzureOpenAI
+                self._openai = AzureOpenAI(
+                    azure_endpoint=os.environ["AZURE_OPENAI_ENDPOINT"].strip(),
+                    api_key=os.getenv("AZURE_OPENAI_KEY", ""),
+                    api_version="2024-10-21")
+            except Exception as exc:
+                print(f"[warn] Azure OpenAI unavailable ({exc}) — falling through.")
+
         # Tier 2: local open-weight model via Ollama (free, private, offline).
         # See research: "Community Open Model Path" — local inference first.
         self.ollama_model = os.getenv("OLLAMA_MODEL", "qwen2.5:7b")

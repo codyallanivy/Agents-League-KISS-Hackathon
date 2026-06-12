@@ -67,7 +67,7 @@ def save_registry():
 
 PROJECTS = discover_projects()
 PROJECTS.update(load_registry())
-ACTIVE = "pizza-shop" if "pizza-shop" in PROJECTS else next(iter(PROJECTS))
+ACTIVE = next((p for p in ("creator-launch", "pizza-shop") if p in PROJECTS), next(iter(PROJECTS)))
 
 try:
     from dotenv import load_dotenv

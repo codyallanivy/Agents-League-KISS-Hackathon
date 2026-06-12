@@ -160,6 +160,12 @@
 <div class="view" id="v3">
   <div class="grid">
     <div class="panel col-span">
+      <h2>✨ Survey Me Now — new project, any kind</h2>
+      <div class="row"><input id="s_idea" placeholder="what are you building? (a campaign, a brand, an app, a course… anything)"><button onclick="getSurvey()">Survey me</button></div>
+      <div id="s_qs"></div>
+      <p class="hint" id="surveyout">Tell it the idea — the intake questions adapt to what you're building. Answers become KISS files; the look &amp; feel answer drives every palette.</p>
+    </div>
+    <div class="panel col-span">
       <h2>Vision Board <span class="sub">(docs → visual understanding)</span></h2>
       <div id="visionwrap3"><p class="hint">no vision board yet for this project</p></div>
       <div class="row" style="margin-top:10px"><button onclick="genVision()">⟳ Regenerate vision board (governed)</button><span class="sub" id="visout" style="align-self:center"></span></div>
@@ -362,7 +368,41 @@ async function genVision(){
 }
 async function loadGallery(){
   const a = await (await fetch("/api/assets")).json();
-  $("gallery").innerHTML = a.map(u=>`<img src="${u}">`).join("") || '<p class="hint">no assets yet — generate a campaign (start.bat → 3)</p>';
+  $("gallery").innerHTML = a.map(u=>{
+    const rel = decodeURIComponent(u.split("p=")[1]);
+    return `<div style="position:relative"><img src="${u}" title="${esc(rel)}">
+      <button onclick="editAsset('${esc(rel)}')" title="Edit with AI (governed)" style="position:absolute;top:6px;right:6px;padding:3px 8px;font-size:11px">✏️ AI</button></div>`;
+  }).join("") || '<p class="hint">no assets yet — use Survey Me Now above</p>';
+}
+async function editAsset(rel){
+  const instruction = prompt("Describe the edit (e.g. 'make the sky stormy purple', 'retitle it The Drowned Coast'):");
+  if(!instruction) return;
+  const r = await (await fetch("/api/edit-asset",{method:"POST",body:JSON.stringify({path:rel,instruction})})).json();
+  if(r.error){ alert(r.error); return; }
+  loadGallery(); alert("Edited ✓ saved as " + r.new + " (original kept; new version queued for verification)");
+}
+let SQS = [];
+async function getSurvey(){
+  const idea = $("s_idea").value.trim();
+  if(!idea){ alert("Describe what you're building first."); return; }
+  $("surveyout").textContent = "writing your intake questions…";
+  const r = await (await fetch("/api/survey-questions",{method:"POST",body:JSON.stringify({idea})})).json();
+  SQS = r.questions;
+  $("s_qs").innerHTML = SQS.map((q,i)=>
+    `<div class="pop-q">${esc(q.q)}</div><input id="sq${i}" placeholder="${esc(q.placeholder||"")}" style="width:100%;margin-bottom:4px">`).join("")
+    + `<button onclick="runSurvey()" style="margin-top:8px">⚒ Generate project (governed)</button>`;
+  $("surveyout").textContent = r.model === "offline" ? "(offline tier: generic KISS intake — connect a model for tailored questions)" : "questions tailored by " + r.model;
+}
+async function runSurvey(){
+  const body = { idea: $("s_idea").value.trim(),
+    qa: SQS.map((q,i)=>({q: q.q, a: $("sq"+i).value.trim()})) };
+  $("surveyout").textContent = "⚒ generating campaign + governed assets… (local models take a few minutes)";
+  try{
+    const r = await (await fetch("/api/campaign",{method:"POST",body:JSON.stringify(body)})).json();
+    if(r.error){ $("surveyout").textContent = "failed: " + r.error; return; }
+    $("surveyout").textContent = `✓ '${r.title}' generated — ${r.words} words · ${r.governance.length} asset checks · now active`;
+    ACTIVE = r.active; refresh();
+  }catch(e){ $("surveyout").textContent = "failed: " + e; }
 }
 $("chatin").addEventListener("keydown",e=>{if(e.key==="Enter")send();});
 $("heroin").addEventListener("keydown",e=>{if(e.key==="Enter")heroSend();});

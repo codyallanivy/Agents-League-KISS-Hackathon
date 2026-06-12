@@ -399,6 +399,25 @@ def browse(path_str):
             "is_kiss": (p / "PROJECT_STATE.md").exists(), "dirs": dirs[:200]}
 
 
+def art_direction(project_dir=None):
+    """Read the project's own files to infer art direction: tone -> palette,
+    goal -> subject, brand voice -> style words. The art inherits the project."""
+    d = project_dir or proj()
+    text = " ".join(read(d / f) for f in
+                    ("PROJECT_STATE.md", "PRODUCT_VISION.md", "BRAND_VOICE.md",
+                     "agile/PRODUCT_VISION.md")).lower()
+    if any(w in text for w in ("grim", "dark", "noir", "horror", "somber")):
+        tone = "grim"
+    elif any(w in text for w in ("whimsical", "playful", "fun", "cozy", "cute")):
+        tone = "whimsical"
+    else:
+        tone = "heroic"
+    goal = (re.search(r"(?:sprint goal|goal|vision)[:*\s]+(.+)", read(d / "PROJECT_STATE.md"),
+                      re.I) or [None, d.name])[1].strip()[:90]
+    voice = read(d / "BRAND_VOICE.md")[:200].replace("\n", " ")
+    return {"tone": tone, "goal": goal, "voice": voice}
+
+
 def board_to_ics():
     """Export the active project's open + blocked tasks as calendar events
     (.ics — opens in Outlook, Google, or Apple Calendar). Zero-auth bridge to
@@ -494,7 +513,7 @@ class H(BaseHTTPRequestHandler):
             self._json({"error": "not found"}, 404)
 
     def do_POST(self):
-        global ACTIVE
+        global ACTIVE, PROJECTS
         n = int(self.headers.get("Content-Length", 0))
         data = json.loads(self.rfile.read(n) or b"{}")
         if self.path == "/api/add-project":
@@ -561,6 +580,153 @@ class H(BaseHTTPRequestHandler):
         elif self.path == "/api/todo":
             ok = toggle_todo(data.get("line", ""), data.get("done", True))
             self._json({"ok": ok, **board()})
+        elif self.path == "/api/survey-questions":
+            idea = data.get("idea", "").strip()
+            qs = None
+            if CTX.model.mode != "offline" and idea:
+                raw = CTX.model.complete(
+                    "You design project-intake surveys. Given an idea, return EXACTLY a "
+                    "JSON array of 5 short intake questions tailored to that idea — "
+                    "covering: a name/seed, the look/feel or tone, the single must-have "
+                    "for v1, what is explicitly out of scope, and who it is for. "
+                    'Format: [{"q": "...", "placeholder": "..."}]. JSON only.',
+                    "IDEA: " + idea[:400])
+                try:
+                    s = raw[raw.index("["):raw.rindex("]") + 1]
+                    qs = json.loads(s)[:5]
+                    qs = [q for q in qs if isinstance(q, dict) and q.get("q")]
+                except Exception:
+                    qs = None
+            if not qs:
+                qs = [
+                    {"q": "What should we call it? (a name or a few seed words)", "placeholder": "name / seed words"},
+                    {"q": "What's the look and feel? (tone, mood, style)", "placeholder": "e.g. warm and playful / dark and serious"},
+                    {"q": "The ONE thing v1 must have?", "placeholder": "the must-have"},
+                    {"q": "What is explicitly OUT of scope for now?", "placeholder": "the off-limits"},
+                    {"q": "Who is it for?", "placeholder": "audience"},
+                ]
+            self._json({"questions": qs, "model": CTX.model.mode})
+        elif self.path == "/api/campaign":
+            import random as _rnd
+            sys.path.insert(0, str(ROOT / "creative-track1"))
+            import campaign_studio as cs
+            idea = data.get("idea", "").strip()
+            qa = data.get("qa", [])
+            if idea:  # adaptive intake: derive the standard fields from idea + answers
+                answers = [str(x.get("a", "")).strip() for x in qa] + [""] * 5
+                alltext = (idea + " " + " ".join(answers)).lower()
+                tone = ("grim" if any(w in alltext for w in ("grim", "dark", "noir", "serious", "horror"))
+                        else "whimsical" if any(w in alltext for w in ("whimsical", "playful", "fun", "cozy", "cute"))
+                        else "heroic")
+                a = {"title_seed": (answers[0] or " ".join(idea.split()[:3])).lower(),
+                     "tone": tone, "setting": "coastal", "party_level": "3", "sessions": "3",
+                     "must_have": answers[2] or idea[:60],
+                     "off_limits": answers[3] or "nothing specified yet"}
+            else:
+                a = {k: str(data.get(k, dflt)).strip() or dflt for k, _q, dflt in cs.SURVEY}
+            out = ROOT / "creative-track1" / "output" / a["title_seed"].replace(" ", "-")
+            title = cs.scaffold_project(a, out)
+            rng = _rnd.Random(a["title_seed"])
+            npcs = list(zip(rng.sample(cs.NAMES, 4), rng.sample(cs.ROLES, 4),
+                            rng.sample(cs.MOTIVES, 4)))
+            prose = None
+            if CTX.model.mode != "offline":
+                if idea:  # generic creation document, grounded in idea + Q/A
+                    qa_lines = "\n".join(f"Q: {x.get('q','')}\nA: {x.get('a','')}" for x in qa)
+                    prose = CTX.model.complete(
+                        "You are a creative director and planner. Produce the primary "
+                        "creation document for this project (whatever fits: campaign, "
+                        "brand kit, product concept, lesson plan, event plan...). "
+                        "Original content only, PG-13. Clean Markdown, 600-1000 words, "
+                        "ending with '## Next Steps' (3 bullets).",
+                        f"IDEA: {idea}\n\nINTAKE ANSWERS:\n{qa_lines}")
+                else:
+                    prose = cs.llm_campaign(CTX.model, a, title, npcs)
+            if not prose:
+                if idea:  # generic offline template
+                    qa_md = "\n".join(f"- **{x.get('q','?')}** {x.get('a','')}" for x in qa if x.get("a"))
+                    prose = (f"# {title}\n\n> Generated offline — connect Ollama or Foundry for a full draft.\n\n"
+                             f"## The Idea\n\n{idea}\n\n## Intake\n\n{qa_md or '- (no answers given)'}\n\n"
+                             f"## Three-Phase Plan\n\n1. **Shape it** — turn the must-have into one testable Tier 1 outcome.\n"
+                             f"2. **Build the smallest version** — only what Tier 1 needs; park everything else in DECISIONS.md.\n"
+                             f"3. **Verify with a real person** — before adding anything new.\n\n"
+                             f"## Next Steps\n\n- Fill PRODUCT_VISION.md tiers\n- Set the sprint goal in PROJECT_STATE.md\n- Generate the vision board")
+                else:
+                    prose = cs.template_campaign(a, title, npcs, rng)
+            (out / "CAMPAIGN.md").write_text(prose, encoding="utf-8")
+            from asset_governor import AssetGovernor as _AG
+            gov = _AG(out)
+            pal = cs.PALETTES.get(a["tone"], cs.PALETTES["heroic"])
+            (out / "assets").mkdir(exist_ok=True)
+            log = []
+            if idea:  # generic asset set — no campaign tropes
+                reqs = [("cover", title),
+                        ("map", "Project overview — " + title),
+                        ("title-card", title),
+                        ("title-card", a["must_have"][:36])]
+            else:
+                reqs = ([("cover", title)] + [("portrait", f"{n} the {r}") for n, r, _m in npcs]
+                        + [("map", "Region map"), ("title-card", f"Session One — {title}")])
+            for kind, prompt in reqs:
+                d = gov.check(kind, prompt)
+                log.append(f"{d['verdict']} {kind}: {prompt[:40]}")
+                if d["verdict"] == "ACCEPT":
+                    p = out / "assets" / f"{kind}-{gov.counts.get(kind, 0) + 1}.svg"
+                    cs.svg_asset(kind, prompt[:36], pal, p, seed=a["title_seed"])
+                    gov.record_generation(kind, p.name, d["estimated_cost_usd"])
+            PROJECTS = discover_projects()
+            PROJECTS.update(load_registry())
+            ACTIVE = out.name
+            for f in sorted(out.rglob("*.md")):
+                CTX.foundry_iq._index_file(f)
+            self._json({"active": ACTIVE, "title": title, "words": len(prose.split()),
+                        "governance": log, "projects": list(PROJECTS)})
+        elif self.path == "/api/edit-asset":
+            rel, instruction = data.get("path", ""), data.get("instruction", "")
+            f = (proj() / rel).resolve()
+            if not (f.is_file() and proj().resolve() in f.parents and f.suffix == ".svg"):
+                self._json({"error": "asset not found"}, 400)
+            elif CTX.model.mode == "offline":
+                self._json({"error": "AI editing needs a model tier — start Ollama "
+                            "or connect Foundry, then retry."}, 400)
+            else:
+                from asset_governor import AssetGovernor as _AG
+                gov = _AG(proj())
+                kind = f.stem.split("-")[0]
+                d = gov.check(kind if kind in ("cover", "portrait", "map") else "cover",
+                              "AI edit: " + instruction)
+                if d["verdict"] == "BLOCK":
+                    gov.park(kind, instruction, d["reasons"])
+                    self._json({"error": "Governor blocked this edit: " + "; ".join(d["reasons"])}, 400)
+                else:
+                    svg = f.read_text(encoding="utf-8")
+                    ad = art_direction()
+                    raw = CTX.model.complete(
+                        "You are a precise SVG artist. Apply the user's instruction to the "
+                        "SVG while staying true to the PROJECT ART CONTEXT (its tone and "
+                        "subject). Keep it valid, same canvas size, original-content-only, "
+                        "PG-13. Return ONLY the complete edited <svg>...</svg> markup.",
+                        f"PROJECT ART CONTEXT: tone={ad['tone']}; about: {ad['goal']}; "
+                        f"voice: {ad['voice'] or 'n/a'}\n\n"
+                        f"INSTRUCTION: {instruction}\n\nSVG:\n{svg[:6000]}")
+                    raw = (raw or "").strip()
+                    if "<svg" not in raw:
+                        self._json({"error": "model did not return valid SVG — try rewording"}, 400)
+                    else:
+                        raw = raw[raw.index("<svg"):]
+                        if "</svg>" in raw:
+                            raw = raw[:raw.rindex("</svg>") + 6]
+                        n = 2
+                        while (f.parent / f"{f.stem}-v{n}.svg").exists():
+                            n += 1
+                        newf = f.parent / f"{f.stem}-v{n}.svg"
+                        newf.write_text(raw, encoding="utf-8")
+                        gov.record_generation(kind, newf.name, d["estimated_cost_usd"])
+                        CTX.tracer.log(agent="AssetEditor", model=CTX.model.mode,
+                                       prompt={"system": "svg-edit", "user": instruction},
+                                       output={"answer": "edited " + rel + " -> " + newf.name},
+                                       extra={"project": ACTIVE})
+                        self._json({"ok": True, "new": newf.name})
         elif self.path == "/api/visualize":
             import os
             env = {**os.environ, "PYTHONIOENCODING": "utf-8", "PYTHONUTF8": "1"}

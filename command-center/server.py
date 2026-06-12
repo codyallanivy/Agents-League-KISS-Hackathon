@@ -69,6 +69,12 @@ PROJECTS = discover_projects()
 PROJECTS.update(load_registry())
 ACTIVE = "pizza-shop" if "pizza-shop" in PROJECTS else next(iter(PROJECTS))
 
+try:
+    from dotenv import load_dotenv
+    load_dotenv(T2 / ".env")
+except ImportError:
+    pass
+
 print("Booting KISS engine …")
 CTX = AgentContext(
     FoundryIQ([T2 / "knowledge"] + list(PROJECTS.values())

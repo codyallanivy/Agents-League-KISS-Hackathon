@@ -369,8 +369,13 @@ def browse(path_str):
     import string
     if not path_str:
         if sys.platform == "win32":
-            drives = [d + ":\\" for d in string.ascii_uppercase
-                      if Path(d + ":\\").exists()]
+            import os
+            drives = []
+            for d in string.ascii_uppercase:
+                for probe in (d + ":\\", d + ":/"):
+                    if os.path.exists(probe):
+                        drives.append(d + ":\\")
+                        break
             return {"path": "", "parent": None,
                     "dirs": [{"name": d, "kiss": False} for d in drives]}
         path_str = "/"

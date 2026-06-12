@@ -177,8 +177,8 @@
     <h2 style="font-size:12px;letter-spacing:2px;color:var(--gold);margin-bottom:8px">FIND YOUR PROJECT FOLDER</h2>
     <div id="bpath" class="sub" style="margin-bottom:8px;word-break:break-all"></div>
     <div id="blist" style="max-height:46vh;overflow-y:auto;margin-bottom:12px"></div>
+    <button id="bselect" onclick="pickFolder()" style="width:100%;margin-bottom:8px;padding:11px;font-size:13px">Use this folder</button>
     <div class="row" style="margin:0">
-      <button id="bselect" onclick="pickFolder()">Use this folder</button>
       <button onclick="$('bmodal').style.display='none'" style="color:var(--dim);border-color:var(--dim)">Cancel</button>
     </div>
     <p class="hint" style="margin-top:8px">⬡ = already a KISS project. Any other folder can be onboarded — your files are never modified.</p>
@@ -215,24 +215,28 @@ async function switchProject(p){
   await fetch("/api/project",{method:"POST",body:JSON.stringify({project:p})});
   ACTIVE = p; refresh();
 }
-let BROWSE = "";
+let BROWSE = "", BDIRS = [], BPARENT = null;
 async function addProject(){ openBrowser(""); }
 async function openBrowser(path){
   const b = await (await fetch("/api/browse?path="+encodeURIComponent(path))).json();
   if(b.error){ alert(b.error); return; }
-  BROWSE = b.path;
+  BROWSE = b.path; BDIRS = b.dirs || []; BPARENT = b.parent;
   $("bpath").textContent = b.path || "Select a drive";
-  $("bselect").style.display = b.path ? "inline-block" : "none";
-  $("bselect").textContent = b.is_kiss ? "✓ Open this KISS project" : "Use this folder (onboard into KISS)";
+  const sel = $("bselect");
+  sel.style.display = b.path ? "block" : "none";
+  if(b.is_kiss){ sel.textContent = "✓ Open this KISS project"; sel.style.borderColor = "var(--good)"; sel.style.color = "var(--good)"; }
+  else { sel.textContent = "⬡ Onboard THIS folder into KISS (creates the memory files — your files untouched)"; sel.style.borderColor = "var(--gold)"; sel.style.color = "var(--gold)"; }
   let rows = "";
-  if(b.parent !== null && b.path) rows += `<div class="brow" onclick="openBrowser('${esc(b.parent).replace(/\\/g,"\\\\")}')">⬑ ..</div>`;
-  rows += b.dirs.map(d=>{
-    const sep = b.path.includes("/") && !b.path.includes("\\") ? "/" : "\\";
-    const full = b.path ? (b.path.endsWith(sep) ? b.path+d.name : b.path+sep+d.name) : d.name;
-    return `<div class="brow" onclick="openBrowser('${esc(full).replace(/\\/g,"\\\\")}')">${d.kiss?"⬡":"📁"} ${esc(d.name)}${d.kiss?' <span class="sub">KISS project</span>':""}</div>`;
-  }).join("");
-  $("blist").innerHTML = rows || '<p class="hint">no subfolders</p>';
+  if(BPARENT !== null && b.path) rows += `<div class="brow" onclick="openBrowser(BPARENT)">⬑ .. (up)</div>`;
+  rows += BDIRS.map((d,i)=>`<div class="brow" onclick="openIdx(${i})">${d.kiss?"⬡":"📁"} ${esc(d.name)}${d.kiss?' <span class="sub">KISS project</span>':""}</div>`).join("");
+  $("blist").innerHTML = rows || '<p class="hint">no subfolders here — use the button below to onboard this folder</p>';
   $("bmodal").style.display = "flex";
+}
+function openIdx(i){
+  const d = BDIRS[i];
+  const sep = (!BROWSE || BROWSE.includes("\\")) ? "\\" : "/";
+  const full = BROWSE ? (BROWSE.endsWith(sep) ? BROWSE + d.name : BROWSE + sep + d.name) : d.name;
+  openBrowser(full);
 }
 async function pickFolder(){
   $("bmodal").style.display = "none";

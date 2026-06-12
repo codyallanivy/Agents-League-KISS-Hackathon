@@ -384,12 +384,16 @@ def browse(path_str):
         return {"error": "not a folder: " + path_str}
     dirs = []
     try:
-        for d in sorted(p.iterdir()):
-            if d.is_dir() and not d.name.startswith((".", "$"))                     and d.name.lower() not in ("node_modules", "__pycache__"):
-                dirs.append({"name": d.name,
-                             "kiss": (d / "PROJECT_STATE.md").exists()})
+        entries = sorted(p.iterdir())
     except PermissionError:
         return {"error": "permission denied: " + path_str}
+    for d in entries:
+        try:
+            if d.is_dir() and not d.name.startswith((".", "$")) and d.name.lower() not in ("node_modules", "__pycache__"):
+                dirs.append({"name": d.name,
+                             "kiss": (d / "PROJECT_STATE.md").exists()})
+        except (PermissionError, OSError):
+            continue  # skip unreadable entries, keep the rest
     parent = str(p.parent) if p.parent != p else ("" if sys.platform == "win32" else None)
     return {"path": str(p), "parent": parent,
             "is_kiss": (p / "PROJECT_STATE.md").exists(), "dirs": dirs[:200]}

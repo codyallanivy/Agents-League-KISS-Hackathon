@@ -50,6 +50,10 @@ Every agent step — prompt, grounding citations, output, model tier — is appe
 
 Three views over the same engine: **Assistant** (chat + model compare), **Project Ops** (board, scope gate, Context ROI Coach, evidence-seeded Popsicle Index, health radar, memo inbox, .ics calendar export), **Creative Studio** (creative chat that creates *and* edits projects by talking, vision board, governed asset gallery). Onboard any folder on your machine into KISS with two clicks — existing files are never modified.
 
+## Roadmap glimpse
+
+`command-center/builder-studio-prototype.html` — a standalone prototype of the next stage: a visual Builder Studio (Plan → Build → Code → Test → Export) that will sit behind the same scope gate and Asset Governor. Not yet wired to the engine; included as a direction marker.
+
 ## Why this is different
 
 Token trackers measure what you *already spent*. KISS estimates context cost **before you spend it**, ties it to project structure, and refuses out-of-scope work by default ("capture it, don't build it"). The methodology is agent-agnostic Markdown; the integrations are Microsoft-native. Built solo with AI-assisted development (GitHub Copilot + Claude), governed by its own methodology — this repo's `GAP_ANALYSIS.md` decision log is the system eating its own popsicle.

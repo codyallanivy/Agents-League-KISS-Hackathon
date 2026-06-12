@@ -1,16 +1,32 @@
 <!DOCTYPE html>
+<!-- ============================================================
+  BUILDER STUDIO — ROADMAP PROTOTYPE (not yet wired to the engine)
+  The "Build" stage of the KISS workflow (Capture->Clarify->Plan->BUILD).
+  Standalone UI exploration: component canvas, Plan/Build/Code/Test/Export.
+  Next step (post-hackathon, D-H14): connect to the Command Center engine
+  so the scope gate, Asset Governor, and IQ layers govern what gets built.
+============================================================ -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/theme/material-darker.min.css">
 <title>Builder Studio Prototype</title>
 <style>
   :root {
     color-scheme: dark;
-    --bg: #080807;
-    --panel: #15130f;
-    --panel-2: #1e1a13;
-    --panel-3: #262116;
+    --font-ui: Inter, Aptos, "Segoe UI", Arial, sans-serif;
+    --font-display: "Segoe UI Semibold", Aptos, "Segoe UI", Arial, sans-serif;
+    --font-code: "Cascadia Code", Consolas, monospace;
+    --bg: #090907;
+    --panel: #15140f;
+    --panel-2: #1e1b13;
+    --panel-3: #2a2418;
+    --surface: #100f0c;
+    --surface-2: #18150f;
+    --canvas: #0c0d0b;
     --edge: #3a3121;
     --edge-soft: #2b2519;
     --ink: #f2eadb;
@@ -18,6 +34,10 @@
     --dim: #766c5c;
     --gold: #f4b94e;
     --gold-soft: #3d2c10;
+    --mint: #8ee6a8;
+    --teal: #89d7cf;
+    --rust: #f08a69;
+    --line: #6a5634;
     --good: #8ee6a8;
     --warn: #e6cc79;
     --bad: #f08a69;
@@ -35,7 +55,7 @@
     min-height: 100vh;
     background: linear-gradient(135deg, #080807 0%, #11100c 52%, #19150e 100%);
     color: var(--ink);
-    font-family: "Cascadia Code", Consolas, "Segoe UI", monospace;
+    font-family: var(--font-ui);
     overflow-x: hidden;
   }
 
@@ -91,6 +111,11 @@
     padding: 8px 10px;
   }
 
+  input[type="color"] {
+    min-height: 36px;
+    padding: 3px;
+  }
+
   textarea {
     min-height: 86px;
     resize: vertical;
@@ -135,6 +160,7 @@
   }
 
   .brand h1 {
+    font-family: var(--font-display);
     font-size: 15px;
     margin: 0;
     letter-spacing: 2px;
@@ -194,8 +220,8 @@
   .shell {
     height: calc(100vh - 65px);
     display: grid;
-    grid-template-columns: minmax(260px, 320px) minmax(0, 1fr) minmax(250px, 310px);
-    grid-template-rows: minmax(0, 1fr) minmax(220px, 31vh);
+    grid-template-columns: minmax(260px, 320px) minmax(0, 1fr) minmax(250px, var(--inspector-width, 310px));
+    grid-template-rows: minmax(0, 1fr) minmax(190px, 28vh);
     gap: 10px;
     padding: 10px;
   }
@@ -227,10 +253,71 @@
     text-transform: uppercase;
   }
 
+  .panel-head-controls {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 5px;
+    flex-wrap: wrap;
+  }
+
+  .panel-collapse-button {
+    min-width: 26px;
+  }
+
   .panel-body {
     padding: 12px;
     height: calc(100% - 43px);
     overflow: auto;
+  }
+
+  .planner-collapsed .planner .panel-body,
+  .inspector-collapsed .inspector .panel-body,
+  .terminal-collapsed .terminal .panel-body {
+    display: none;
+  }
+
+  .planner-collapsed .shell {
+    grid-template-columns: 74px minmax(0, 1fr) minmax(250px, var(--inspector-width, 310px));
+  }
+
+  .inspector-collapsed .shell {
+    grid-template-columns: minmax(260px, 320px) minmax(0, 1fr) 74px;
+  }
+
+  .planner-collapsed.inspector-collapsed .shell {
+    grid-template-columns: 74px minmax(0, 1fr) 74px;
+  }
+
+  .terminal-collapsed .shell {
+    grid-template-rows: minmax(0, 1fr) 44px;
+  }
+
+  .planner-collapsed .planner,
+  .inspector-collapsed .inspector,
+  .terminal-collapsed .terminal {
+    min-height: 0;
+  }
+
+  .planner-collapsed .planner .panel-head,
+  .inspector-collapsed .inspector .panel-head {
+    height: 100%;
+    flex-direction: column;
+    justify-content: flex-start;
+    padding: 8px 4px;
+  }
+
+  .planner-collapsed .planner .panel-head h2,
+  .inspector-collapsed .inspector .panel-head h2 {
+    writing-mode: vertical-rl;
+    text-orientation: mixed;
+  }
+
+  .planner-collapsed .planner .badge,
+  .inspector-collapsed .inspector .badge,
+  .planner-collapsed .planner .resize-button,
+  .inspector-collapsed .inspector .resize-button {
+    display: none;
   }
 
   .planner {
@@ -276,7 +363,7 @@
   }
 
   .summary {
-    background: #100f0c;
+    background: var(--surface);
     border: 1px solid var(--edge-soft);
     border-left: 3px solid var(--gold);
     border-radius: 6px;
@@ -362,9 +449,14 @@
   .component-card,
   .log-card,
   .suggest-card,
-  .model-card {
+  .model-card,
+  .tutorial-card,
+  .next-card,
+  .flow-card,
+  .iq-card,
+  .agent-card {
     border: 1px solid var(--edge-soft);
-    background: #100f0c;
+    background: var(--surface);
     border-radius: 6px;
   }
 
@@ -406,7 +498,7 @@
   .stage {
     height: 100%;
     display: grid;
-    grid-template-rows: auto auto minmax(0, 1fr);
+    grid-template-rows: auto auto auto minmax(0, 1fr);
   }
 
   .stage-top {
@@ -416,6 +508,46 @@
     gap: 10px;
     padding: 10px 12px;
     border-bottom: 1px solid var(--edge-soft);
+  }
+
+  .workflow-nav {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--edge-soft);
+    background: rgba(15, 13, 10, 0.75);
+  }
+
+  .workflow-steps {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 6px;
+  }
+
+  .workflow-step {
+    min-width: 0;
+    border: 1px solid var(--edge-soft);
+    border-radius: 999px;
+    padding: 6px 8px;
+    color: var(--muted);
+    font-size: 10px;
+    text-align: center;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .workflow-step.current {
+    border-color: var(--gold);
+    background: var(--gold-soft);
+    color: var(--gold);
+  }
+
+  .workflow-step.done {
+    border-color: rgba(142, 230, 168, 0.45);
+    color: var(--good);
   }
 
   .stage-title {
@@ -469,16 +601,102 @@
     line-height: 1.35;
   }
 
+  .tutorial-strip {
+    display: grid;
+    grid-template-columns: minmax(220px, 0.9fr) minmax(0, 1.4fr);
+    gap: 10px;
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--edge-soft);
+    background: rgba(16, 15, 12, 0.78);
+  }
+
+  .tutorial-strip.closed {
+    grid-template-columns: 1fr auto;
+    align-items: center;
+  }
+
+  .tutorial-card,
+  .next-card,
+  .flow-card,
+  .iq-card,
+  .agent-card {
+    padding: 10px;
+  }
+
+  .tutorial-card h3,
+  .next-card h3,
+  .flow-card h3,
+  .iq-card h3,
+  .agent-card h3 {
+    margin: 0 0 5px;
+    color: var(--ink);
+    font-size: 12px;
+  }
+
+  .tutorial-card p,
+  .next-card p,
+  .flow-card p,
+  .iq-card p,
+  .agent-card p {
+    margin: 0;
+    color: var(--muted);
+    font-size: 11px;
+    line-height: 1.45;
+  }
+
+  .tutorial-steps {
+    display: grid;
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: 6px;
+  }
+
+  .tutorial-step {
+    min-width: 0;
+    border: 1px solid var(--edge-soft);
+    border-radius: 6px;
+    padding: 7px;
+    background: #0f0d0a;
+    color: var(--muted);
+    font-size: 10px;
+    line-height: 1.3;
+  }
+
+  .tutorial-step b {
+    display: block;
+    color: var(--ink);
+    margin-bottom: 3px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .tutorial-step.done {
+    border-color: rgba(142, 230, 168, 0.45);
+  }
+
+  .tutorial-step.active {
+    border-color: var(--gold);
+    background: var(--gold-soft);
+  }
+
   .stage-body {
     overflow: auto;
     padding: 12px;
     display: grid;
+    grid-template-rows: auto auto auto;
     gap: 12px;
     align-content: start;
+    min-height: 0;
   }
 
   .tool-grid {
     grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    max-height: 164px;
+    overflow: auto;
+  }
+
+  .tool-shelf {
+    min-height: 0;
   }
 
   .tool-card {
@@ -505,10 +723,12 @@
     background:
       linear-gradient(45deg, rgba(244, 185, 78, 0.03) 25%, transparent 25%),
       linear-gradient(-45deg, rgba(244, 185, 78, 0.03) 25%, transparent 25%),
-      #0d0c09;
+      var(--canvas);
     background-size: 18px 18px;
-    min-height: 340px;
+    min-height: min(52vh, 520px);
     overflow: hidden;
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr);
   }
 
   .canvas-toolbar {
@@ -519,14 +739,73 @@
     padding: 8px 10px;
     border-bottom: 1px solid var(--edge-soft);
     background: rgba(21, 19, 15, 0.92);
+    flex-wrap: wrap;
+  }
+
+  .canvas-toolbar-actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+
+  .zoom-readout {
+    color: var(--teal);
+    font-family: var(--font-code);
+    font-size: 11px;
+    min-width: 44px;
+    text-align: center;
+  }
+
+  .viewport-shell {
+    overflow: auto;
+    min-height: 0;
+    background:
+      linear-gradient(rgba(137, 215, 207, 0.07) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(137, 215, 207, 0.07) 1px, transparent 1px),
+      radial-gradient(circle at 20% 20%, rgba(244, 185, 78, 0.06), transparent 32%),
+      #090a08;
+    background-size: 32px 32px, 32px 32px, auto, auto;
+  }
+
+  .viewport-grid {
+    min-width: max(100%, 860px);
+    min-height: 520px;
+    padding: 18px;
   }
 
   .preview {
-    min-height: 300px;
-    padding: 18px;
+    width: min(100%, 790px);
+    min-height: 420px;
+    padding: 22px;
     display: grid;
     align-content: start;
     gap: 10px;
+    border: 1px solid rgba(106, 86, 52, 0.8);
+    border-radius: 8px;
+    background: var(--page-bg, rgba(16, 15, 12, 0.95));
+    color: var(--page-text, var(--ink));
+    font-family: var(--page-font, var(--font-ui));
+    box-shadow: 0 20px 38px rgba(0, 0, 0, 0.32);
+    zoom: var(--viewport-zoom, 1);
+  }
+
+  .preview.phone-preview {
+    background: #090a08;
+  }
+
+  .preview .component-card {
+    background: var(--component-panel, var(--page-panel, var(--surface)));
+    border-color: var(--component-border, var(--page-border, var(--edge-soft)));
+    color: var(--component-text, var(--page-text, var(--ink)));
+    font-family: var(--component-font, var(--page-font, var(--font-ui)));
+  }
+
+  .preview .component-card.page-header h3,
+  .preview .component-card.page-header p,
+  .preview .component-card.text-block,
+  .preview .component-card.input-block b {
+    color: var(--component-text, var(--page-text, var(--ink)));
   }
 
   .empty-canvas {
@@ -539,15 +818,49 @@
     padding: 20px;
   }
 
+  .empty-canvas b {
+    color: var(--ink);
+  }
+
+  .empty-actions {
+    display: flex;
+    justify-content: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-top: 12px;
+  }
+
   .component-card {
     padding: 12px;
     color: var(--ink);
     position: relative;
+    border-left-width: 4px;
+    overflow: hidden;
   }
 
   .component-card.selected {
     border-color: var(--gold);
     box-shadow: 0 0 0 1px rgba(244, 185, 78, 0.25) inset;
+  }
+
+  .component-card.type-header {
+    border-left-color: var(--gold);
+  }
+
+  .component-card.type-text,
+  .component-card.type-input {
+    border-left-color: var(--teal);
+  }
+
+  .component-card.type-button,
+  .component-card.type-workflow-action {
+    border-left-color: var(--mint);
+  }
+
+  .component-card.type-terminal-card,
+  .component-card.type-workflow-trigger,
+  .component-card.type-event {
+    border-left-color: var(--rust);
   }
 
   .component-card header {
@@ -571,9 +884,73 @@
   .component-card.button-block {
     display: inline-flex;
     width: fit-content;
-    background: var(--gold);
-    color: #171006;
+    background: var(--component-accent, var(--page-accent, var(--gold)));
+    border-color: var(--component-border, var(--page-border, var(--edge-soft)));
+    color: var(--component-button-text, var(--page-button-text, #171006));
     font-weight: 700;
+  }
+
+  .editable-text {
+    min-width: 12px;
+    outline: 1px dashed transparent;
+    border-radius: 4px;
+    padding: 1px 2px;
+    cursor: text;
+  }
+
+  .editable-text:hover {
+    outline-color: rgba(244, 185, 78, 0.38);
+  }
+
+  .editable-text:focus {
+    outline: 2px solid var(--page-accent, var(--gold));
+    background: rgba(244, 185, 78, 0.12);
+  }
+
+  .style-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .style-grid .wide {
+    grid-column: 1 / -1;
+  }
+
+  .field-toggle {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    border: 1px solid var(--edge-soft);
+    border-radius: 6px;
+    padding: 8px;
+    background: #0f0d0a;
+    color: var(--ink);
+    font-size: 12px;
+    letter-spacing: 0;
+    text-transform: none;
+    margin: 0;
+  }
+
+  .field-toggle input {
+    width: auto;
+    accent-color: var(--gold);
+  }
+
+  .component-style-panel {
+    display: grid;
+    gap: 10px;
+    padding: 10px;
+    border: 1px solid var(--edge-soft);
+    border-radius: 6px;
+    background: var(--surface);
+  }
+
+  .component-style-panel h3 {
+    margin: 0;
+    color: var(--ink);
+    font-size: 12px;
   }
 
   .component-card.input-block {
@@ -582,10 +959,10 @@
   }
 
   .component-card.input-block .fake-input {
-    border: 1px solid var(--edge);
+    border: 1px solid var(--component-border, var(--page-border, var(--edge)));
     border-radius: 6px;
     padding: 10px;
-    color: var(--muted);
+    color: var(--component-text, var(--page-text, var(--muted)));
     background: #0f0d0a;
     min-width: min(100%, 320px);
   }
@@ -607,7 +984,8 @@
     display: grid;
     align-content: start;
     gap: 10px;
-    background: #17140f;
+    background: var(--page-bg, #17140f);
+    color: var(--page-text, var(--ink));
   }
 
   .calculator-shell {
@@ -751,6 +1129,10 @@
     margin-bottom: 5px;
   }
 
+  .log-card.assistant .cmd {
+    color: var(--teal);
+  }
+
   .log-card .result {
     color: var(--ink);
     white-space: pre-wrap;
@@ -792,6 +1174,45 @@
     gap: 10px;
   }
 
+  .code-area {
+    display: grid;
+    grid-template-columns: minmax(0, 1.35fr) minmax(220px, 0.65fr);
+    gap: 10px;
+  }
+
+  .code-editor {
+    min-height: 420px;
+    font-family: var(--font-code);
+    font-size: 12px;
+    line-height: 1.5;
+    tab-size: 2;
+  }
+
+  .code-help {
+    display: grid;
+    gap: 8px;
+    align-content: start;
+  }
+
+  .code-help .model-card {
+    min-height: unset;
+  }
+
+  .CodeMirror {
+    min-height: 420px;
+    height: 56vh;
+    border: 1px solid var(--edge-soft);
+    border-radius: 6px;
+    font-family: var(--font-code);
+    font-size: 12px;
+  }
+
+  .code-status {
+    color: var(--muted);
+    font-size: 11px;
+    line-height: 1.45;
+  }
+
   .export-area textarea {
     min-height: 260px;
     font-size: 11px;
@@ -821,6 +1242,95 @@
     line-height: 1.45;
   }
 
+  .capability-grid,
+  .flow-list,
+  .agent-grid {
+    display: grid;
+    gap: 8px;
+  }
+
+  .capability-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .agent-card {
+    border-left: 3px solid var(--teal);
+  }
+
+  .agent-card.active {
+    border-color: rgba(142, 230, 168, 0.55);
+    border-left-color: var(--mint);
+    background: rgba(142, 230, 168, 0.07);
+  }
+
+  .iq-card {
+    border-left: 3px solid var(--gold);
+  }
+
+  .iq-card strong,
+  .flow-card strong {
+    color: var(--ink);
+    font-size: 11px;
+  }
+
+  .flow-card {
+    display: grid;
+    gap: 6px;
+    border-left: 3px solid var(--mint);
+  }
+
+  .flow-builder {
+    display: grid;
+    gap: 10px;
+  }
+
+  .flow-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .interaction-editor {
+    display: grid;
+    gap: 10px;
+    padding: 10px;
+    border: 1px solid var(--edge-soft);
+    border-radius: 6px;
+    background: var(--surface);
+  }
+
+  .interaction-row {
+    display: grid;
+    gap: 8px;
+    border: 1px solid var(--edge-soft);
+    border-radius: 6px;
+    padding: 8px;
+    background: #0f0d0a;
+  }
+
+  .interaction-row-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+  }
+
+  .source-list {
+    display: grid;
+    gap: 5px;
+    margin-top: 8px;
+  }
+
+  .source-list span {
+    display: block;
+    border: 1px solid var(--edge-soft);
+    border-radius: 999px;
+    padding: 4px 7px;
+    color: var(--muted);
+    font-size: 10px;
+    width: fit-content;
+  }
+
   .check {
     display: grid;
     grid-template-columns: auto 1fr;
@@ -847,12 +1357,61 @@
   }
 
   .focus-mode .planner,
-  .focus-mode .inspector {
+  .focus-mode .inspector,
+  .focus-mode .terminal {
     display: none;
   }
 
   .focus-mode .workspace {
     grid-column: 1 / 4;
+    grid-row: 1 / 3;
+  }
+
+  .preview-only-mode .planner,
+  .preview-only-mode .terminal,
+  .preview-only-mode .tool-shelf,
+  .preview-only-mode .level-strip,
+  .preview-only-mode .tutorial-strip,
+  .preview-only-mode #modeDetail {
+    display: none;
+  }
+
+  .preview-only-mode .shell {
+    grid-template-columns: minmax(0, 1fr) minmax(280px, var(--inspector-width, 330px));
+    grid-template-rows: minmax(0, 1fr);
+  }
+
+  .preview-only-mode .workspace {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  .preview-only-mode .inspector {
+    display: block;
+    grid-column: 2;
+    grid-row: 1;
+  }
+
+  .preview-only-mode.inspector-collapsed .shell {
+    grid-template-columns: minmax(0, 1fr) 74px;
+  }
+
+  .preview-only-mode .stage {
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+
+  .preview-only-mode .stage-body {
+    overflow: hidden;
+    grid-template-rows: minmax(0, 1fr);
+  }
+
+  .preview-only-mode .canvas-wrap {
+    min-height: calc(100vh - 150px);
+  }
+
+  .preview-only-mode .preview {
+    width: min(100%, 980px);
+    min-height: 640px;
   }
 
   @media (max-width: 1100px) {
@@ -887,8 +1446,20 @@
       min-height: 420px;
     }
 
-    .focus-mode .workspace {
+    .focus-mode .workspace,
+    .preview-only-mode .workspace {
       grid-column: 1;
+      grid-row: auto;
+    }
+
+    .preview-only-mode .shell {
+      grid-template-columns: 1fr;
+      grid-template-rows: auto auto;
+    }
+
+    .preview-only-mode .inspector {
+      grid-column: 1;
+      grid-row: auto;
     }
   }
 
@@ -910,9 +1481,39 @@
     }
 
     .level-strip,
+    .tutorial-strip,
+    .tutorial-steps,
+    .workflow-nav,
+    .capability-grid,
+    .style-grid,
+    .code-area,
     .workflow,
     .model-graph {
       grid-template-columns: 1fr;
+    }
+
+    .workflow-steps {
+      grid-template-columns: repeat(5, minmax(64px, 1fr));
+      overflow-x: auto;
+      padding-bottom: 2px;
+    }
+
+    .stage-body {
+      overflow: visible;
+      grid-template-rows: auto auto auto;
+    }
+
+    .preview-only-mode .stage-body {
+      overflow: hidden;
+      grid-template-rows: minmax(0, 1fr);
+    }
+
+    .canvas-wrap {
+      min-height: 520px;
+    }
+
+    .viewport-grid {
+      min-width: 680px;
     }
 
     .terminal .panel-body {
@@ -940,6 +1541,7 @@
   <nav class="mode-tabs" aria-label="Builder mode">
     <button class="on" data-mode="plan" onclick="setMode('plan')">Plan</button>
     <button data-mode="build" onclick="setMode('build')">Build</button>
+    <button data-mode="code" onclick="setMode('code')">Code</button>
     <button data-mode="test" onclick="setMode('test')">Test</button>
     <button data-mode="export" onclick="setMode('export')">Export</button>
   </nav>
@@ -954,6 +1556,11 @@
     <label class="toggle" title="Show explanations with every action">
       <input id="explainToggle" type="checkbox" checked onchange="setExplain(this.checked)"> Explain
     </label>
+    <label class="toggle" title="Use the mock Foundry grounding panel. This prototype does not call your account.">
+      <input id="foundryToggle" type="checkbox" onchange="setFoundry(this.checked)"> Foundry Mock
+    </label>
+    <button class="small" id="tutorialButton" onclick="toggleTutorial()">Tutorial</button>
+    <button class="small" id="previewOnlyButton" onclick="togglePreviewOnly()">Preview Only</button>
     <button class="small" onclick="resetPrototype()">Reset</button>
     <button class="small primary" onclick="exportModel()">Export Model</button>
   </div>
@@ -963,7 +1570,10 @@
   <section class="panel planner" aria-label="KISS planner">
     <div class="panel-head">
       <h2>Simple Studio</h2>
-      <span class="badge gold" id="modeBadge">plan</span>
+      <div class="panel-head-controls">
+        <span class="badge gold" id="modeBadge">plan</span>
+        <button class="small panel-collapse-button" id="plannerCollapseButton" onclick="togglePanel('planner')" title="Minimize planner">-</button>
+      </div>
     </div>
     <div class="panel-body">
       <div class="field-row">
@@ -1015,6 +1625,12 @@
         </div>
       </div>
 
+      <div class="workflow-nav" aria-label="Build workflow navigation">
+        <button class="small" id="prevModeButton" onclick="goWorkflowMode(-1)">Previous</button>
+        <div class="workflow-steps" id="workflowSteps"></div>
+        <button class="small primary" id="nextModeButton" onclick="goWorkflowMode(1)">Next</button>
+      </div>
+
       <div class="level-strip">
         <div class="level active" data-level="1">
           <b>Level 1 - Structure</b>
@@ -1034,8 +1650,10 @@
         </div>
       </div>
 
+      <div id="tutorialStrip" class="tutorial-strip"></div>
+
       <div class="stage-body" id="stageBody">
-        <section>
+        <section class="tool-shelf">
           <div class="row" style="justify-content:space-between;margin-bottom:8px">
             <label style="margin:0">Relevant tools</label>
             <span class="hint" id="hiddenToolsHint">No plan yet.</span>
@@ -1045,13 +1663,25 @@
 
         <section class="canvas-wrap">
           <div class="canvas-toolbar">
-            <span class="badge gold">Build Space</span>
             <div class="row" style="width:auto">
+              <span class="badge gold">Build Space</span>
+              <span class="badge" id="agentBadge">Planner Agent</span>
+            </div>
+            <div class="canvas-toolbar-actions">
+              <button class="small" onclick="zoomViewport(-0.1)">Zoom -</button>
+              <span class="zoom-readout" id="zoomReadout">100%</span>
+              <button class="small" onclick="zoomViewport(0.1)">Zoom +</button>
+              <button class="small" onclick="fitViewport()">Fit</button>
+              <button class="small" onclick="resetViewport()">100%</button>
               <button class="small" onclick="duplicateSelected()">Duplicate</button>
               <button class="small" onclick="removeSelected()">Remove</button>
             </div>
           </div>
-          <div id="preview" class="preview" data-testid="preview"></div>
+          <div class="viewport-shell" id="viewportShell" data-testid="viewport-shell">
+            <div class="viewport-grid">
+              <div id="preview" class="preview" data-testid="preview"></div>
+            </div>
+          </div>
         </section>
 
         <section id="modeDetail"></section>
@@ -1062,7 +1692,12 @@
   <aside class="panel inspector" aria-label="Inspector and AI guide">
     <div class="panel-head">
       <h2>Inspector</h2>
-      <span class="badge" id="selectionBadge">none</span>
+      <div class="panel-head-controls">
+        <button class="small resize-button" onclick="resizePanel('inspector', -40)" title="Narrow inspector">-</button>
+        <button class="small resize-button" onclick="resizePanel('inspector', 40)" title="Widen inspector">+</button>
+        <span class="badge" id="selectionBadge">none</span>
+        <button class="small panel-collapse-button" id="inspectorCollapseButton" onclick="togglePanel('inspector')" title="Minimize inspector">-</button>
+      </div>
     </div>
     <div class="panel-body">
       <div id="inspectorBody" class="inspector-empty">
@@ -1074,6 +1709,24 @@
         <p id="aiGuide">Plan the project first. I will suggest one small next action and explain why it matters.</p>
         <div class="confidence"><span id="confidenceBar"></span></div>
         <p class="hint" id="confidenceText">confidence: 72 percent</p>
+      </div>
+
+      <div class="suggest-card">
+        <h3>Local Agents</h3>
+        <div id="localAgents" class="agent-grid"></div>
+      </div>
+
+      <div class="suggest-card">
+        <h3>Foundry IQ Mock</h3>
+        <span class="badge warn" id="foundryStatus">off - 0 tokens</span>
+        <p id="foundryGuide">Grounding layer is ready to explain why each build step matters.</p>
+        <div id="foundrySources" class="source-list"></div>
+      </div>
+
+      <div class="suggest-card">
+        <h3>Web Style</h3>
+        <p class="hint">These controls change the page you are building, not the studio chrome.</p>
+        <div id="styleControls" class="style-grid"></div>
       </div>
 
       <div class="field-row" style="margin-top:12px">
@@ -1088,10 +1741,11 @@
 
   <section class="panel terminal" aria-label="Smart terminal">
     <div class="panel-head">
-      <h2>AI Guide + Smart Terminal</h2>
-      <div class="row" style="width:auto">
+      <h2>AI Chat + Smart Terminal</h2>
+      <div class="panel-head-controls">
         <span class="badge good">sandbox only</span>
         <span class="badge" id="cwdBadge">/</span>
+        <button class="small panel-collapse-button" id="terminalCollapseButton" onclick="togglePanel('terminal')" title="Minimize terminal">-</button>
       </div>
     </div>
     <div class="panel-body">
@@ -1099,24 +1753,31 @@
         <div id="termHistory" class="term-history" data-testid="terminal-history"></div>
         <div class="term-input">
           <span class="prompt" id="promptPath">/ $</span>
-          <input id="termInput" data-testid="terminal-input" placeholder="try: help, mkdir project, touch index.html, scaffold webpage">
-          <button class="primary" data-testid="terminal-run" onclick="runTerminal()">Simulate</button>
+          <input id="termInput" data-testid="terminal-input" placeholder="ask anything, or try: help, mkdir project, scaffold webpage">
+          <button class="primary" data-testid="terminal-run" onclick="runTerminal()">Ask / Run</button>
         </div>
       </div>
       <div class="terminal-side">
         <label>Sandbox filesystem</label>
         <div id="filesystemView" class="filesystem"></div>
         <div class="summary" style="margin-bottom:0">
-          No command touches your real machine. Each command returns a result, a what-if preview, and suggested next actions.
+          Ask questions here when stuck. Safe commands are simulated; local assistant answers do not call Foundry.
         </div>
       </div>
     </div>
   </section>
 </main>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/xml/xml.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/javascript/javascript.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/css/css.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/htmlmixed/htmlmixed.min.js"></script>
 <script>
 const $ = id => document.getElementById(id);
 const uid = prefix => prefix + "-" + Math.random().toString(36).slice(2, 8);
+const PROTOTYPE_FILE_PATH = "D:/Repositories/agile studio templates/Agile Studio Product.worktrees/agents-hackathon-copilot-integration/Agents-League-KISS-Hackathon/command-center/builder-studio-prototype.html";
+const WORKFLOW_MODES = ["plan", "build", "code", "test", "export"];
 const esc = value => String(value ?? "")
   .replace(/&/g, "&amp;")
   .replace(/</g, "&lt;")
@@ -1268,6 +1929,71 @@ const TEMPLATES = [
   }
 ];
 
+const LOCAL_AGENTS = [
+  {
+    id: "planner",
+    name: "Planner Agent",
+    layer: "Local",
+    job: "Turns the goal into a small KISS plan and hides unrelated tools.",
+    modes: ["plan"]
+  },
+  {
+    id: "builder",
+    name: "Builder Agent",
+    layer: "Local",
+    job: "Adds components, keeps the canvas readable, and points to the next edit.",
+    modes: ["build"]
+  },
+  {
+    id: "interaction",
+    name: "Interaction Agent",
+    layer: "Local",
+    job: "Connects clicks, inputs, and commands into simple when-this-then-that flows.",
+    modes: ["build", "test"]
+  },
+  {
+    id: "tester",
+    name: "Test Agent",
+    layer: "Local",
+    job: "Runs prototype checks and tells the user what is still missing.",
+    modes: ["test", "export"]
+  },
+  {
+    id: "tutor",
+    name: "Tutor Agent",
+    layer: "Local",
+    job: "Explains one beginner action at a time without requiring code vocabulary.",
+    modes: ["plan", "build", "test", "export"]
+  }
+];
+
+const IQ_SOURCES = [
+  "Foundry IQ mock: grounded planner knowledge",
+  "OWASP-style validation guidance",
+  "WCAG-style usability and accessibility guidance",
+  "Internal project memory from prior builds"
+];
+
+function componentStyleDefaults() {
+  return {
+    useGlobal: true,
+    font: "",
+    panel: "",
+    text: "",
+    border: "",
+    accent: "",
+    buttonText: ""
+  };
+}
+
+function normalizeComponent(item) {
+  return {
+    ...item,
+    props: item.props || {},
+    styles: { ...componentStyleDefaults(), ...(item.styles || {}) }
+  };
+}
+
 function component(type, props = {}) {
   const defaults = {
     header: { title: "New Header", subtitle: "A short supporting line." },
@@ -1293,6 +2019,7 @@ function component(type, props = {}) {
     type,
     name: labelForType(type),
     props: { ...(defaults[type] || {}), ...props },
+    styles: componentStyleDefaults(),
     createdAt: new Date().toISOString()
   };
 }
@@ -1314,6 +2041,28 @@ function createInitialState() {
     expertMode: false,
     focusMode: false,
     explainMode: true,
+    foundryEnabled: false,
+    tutorialOpen: true,
+    previewOnlyMode: false,
+    viewportZoom: 1,
+    uniformComponentStyle: true,
+    panels: {
+      planner: false,
+      inspector: false,
+      terminal: false
+    },
+    panelSizes: {
+      inspector: 310
+    },
+    styles: {
+      font: "Inter, Aptos, Segoe UI, Arial, sans-serif",
+      pageBg: "#f7f0df",
+      text: "#24190d",
+      panel: "#fffaf0",
+      border: "#d7b16a",
+      accent: "#f4b94e",
+      buttonText: "#171006"
+    },
     level: 1,
     goal: "",
     plan: null,
@@ -1321,6 +2070,8 @@ function createInitialState() {
     components: [],
     flows: [],
     selectedComponentId: null,
+    codeDraft: "",
+    codeDirty: false,
     audit: [],
     terminal: {
       cwd: "/",
@@ -1341,7 +2092,18 @@ let state = loadState();
 function loadState() {
   try {
     const saved = JSON.parse(localStorage.getItem("builder-studio-prototype") || "null");
-    return saved ? { ...createInitialState(), ...saved } : createInitialState();
+    if (!saved) return createInitialState();
+    const initial = createInitialState();
+    const next = {
+      ...initial,
+      ...saved,
+      styles: { ...initial.styles, ...(saved.styles || {}) },
+      panels: { ...initial.panels, ...(saved.panels || {}) },
+      panelSizes: { ...initial.panelSizes, ...(saved.panelSizes || {}) },
+      terminal: { ...initial.terminal, ...(saved.terminal || {}) }
+    };
+    next.components = (next.components || []).map(normalizeComponent);
+    return next;
   } catch {
     return createInitialState();
   }
@@ -1374,11 +2136,19 @@ function updateProjectName(value) {
 }
 
 function setMode(mode) {
+  if (state.mode === "code") syncCodeDraftFromEditor();
   state.mode = mode;
+  if (mode === "code") ensureCodeDraft();
   if (mode === "export") exportModel(false);
   if (mode === "test") runChecks(false);
   saveState();
   render();
+}
+
+function goWorkflowMode(delta) {
+  const current = Math.max(0, WORKFLOW_MODES.indexOf(state.mode));
+  const next = Math.max(0, Math.min(WORKFLOW_MODES.length - 1, current + delta));
+  setMode(WORKFLOW_MODES[next]);
 }
 
 function setExpert(enabled) {
@@ -1401,6 +2171,176 @@ function setExplain(enabled) {
   addAudit(enabled ? "Explain mode enabled." : "Explain mode disabled.");
   saveState();
   render();
+}
+
+function setFoundry(enabled) {
+  state.foundryEnabled = enabled;
+  addAudit(enabled ? "Foundry mock enabled. No account calls are made in this prototype." : "Foundry mock disabled. Local-only guidance is active.");
+  saveState();
+  renderFoundryGuide();
+  renderModeDetail();
+  renderTerminal();
+  updateBadges();
+}
+
+function updateStyle(key, value) {
+  state.styles[key] = value;
+  saveState();
+  updatePreviewStyles();
+  renderExportIfVisible();
+}
+
+function setUniformComponentStyle(enabled) {
+  state.uniformComponentStyle = enabled;
+  if (!enabled) {
+    const selected = getSelected() || state.components[0];
+    if (selected) {
+      state.selectedComponentId = selected.id;
+      seedComponentStyle(selected);
+      selected.styles.useGlobal = false;
+    }
+  }
+  addAudit(enabled ? "Uniform component styling enabled." : "Individual component styling enabled.");
+  saveState();
+  renderPreview();
+  renderInspector();
+  renderStyleControls();
+  renderExportIfVisible();
+}
+
+function fallbackComponentStyle(key) {
+  const fallback = {
+    font: state.styles.font,
+    panel: state.styles.panel,
+    text: state.styles.text,
+    border: state.styles.border,
+    accent: state.styles.accent,
+    buttonText: state.styles.buttonText
+  };
+  return fallback[key] || "";
+}
+
+function seedComponentStyle(item) {
+  item.styles = { ...componentStyleDefaults(), ...(item.styles || {}) };
+  ["font", "panel", "text", "border", "accent", "buttonText"].forEach(key => {
+    if (!item.styles[key]) item.styles[key] = fallbackComponentStyle(key);
+  });
+}
+
+function setComponentCustomStyle(enabled) {
+  const selected = getSelected();
+  if (!selected) return;
+  seedComponentStyle(selected);
+  selected.styles.useGlobal = !enabled;
+  addAudit(enabled ? "Selected block now has individual styling." : "Selected block now follows global styling.");
+  saveState();
+  renderPreview();
+  renderInspector();
+  renderExportIfVisible();
+}
+
+function updateComponentStyle(key, value) {
+  const selected = getSelected();
+  if (!selected) return;
+  state.uniformComponentStyle = false;
+  seedComponentStyle(selected);
+  selected.styles.useGlobal = false;
+  selected.styles[key] = value;
+  saveState();
+  renderPreview();
+  renderStyleControls();
+  renderExportIfVisible();
+}
+
+function togglePanel(name) {
+  if (!state.panels) state.panels = createInitialState().panels;
+  state.panels[name] = !state.panels[name];
+  saveState();
+  updatePanelLayout();
+}
+
+function resizePanel(name, delta) {
+  if (name !== "inspector") return;
+  if (!state.panelSizes) state.panelSizes = createInitialState().panelSizes;
+  const current = Number(state.panelSizes.inspector || 310);
+  state.panelSizes.inspector = Math.max(260, Math.min(520, current + delta));
+  saveState();
+  updatePanelLayout();
+}
+
+function updatePanelLayout() {
+  if (!state.panels) state.panels = createInitialState().panels;
+  if (!state.panelSizes) state.panelSizes = createInitialState().panelSizes;
+  document.body.classList.toggle("planner-collapsed", !!state.panels.planner);
+  document.body.classList.toggle("inspector-collapsed", !!state.panels.inspector);
+  document.body.classList.toggle("terminal-collapsed", !!state.panels.terminal);
+  const shell = $("shell");
+  if (shell) shell.style.setProperty("--inspector-width", `${state.panelSizes.inspector || 310}px`);
+  const plannerButton = $("plannerCollapseButton");
+  const inspectorButton = $("inspectorCollapseButton");
+  const terminalButton = $("terminalCollapseButton");
+  if (plannerButton) plannerButton.textContent = state.panels.planner ? "+" : "-";
+  if (inspectorButton) inspectorButton.textContent = state.panels.inspector ? "+" : "-";
+  if (terminalButton) terminalButton.textContent = state.panels.terminal ? "+" : "-";
+}
+
+function updatePreviewStyles() {
+  const preview = $("preview");
+  if (!preview) return;
+  preview.style.setProperty("--page-font", state.styles.font);
+  preview.style.setProperty("--page-bg", state.styles.pageBg);
+  preview.style.setProperty("--page-text", state.styles.text);
+  preview.style.setProperty("--page-panel", state.styles.panel);
+  preview.style.setProperty("--page-border", state.styles.border);
+  preview.style.setProperty("--page-accent", state.styles.accent);
+  preview.style.setProperty("--page-button-text", state.styles.buttonText);
+}
+
+function toggleTutorial() {
+  state.tutorialOpen = !state.tutorialOpen;
+  addAudit(state.tutorialOpen ? "Tutorial opened." : "Tutorial collapsed.");
+  saveState();
+  renderTutorial();
+  updateBadges();
+}
+
+function togglePreviewOnly() {
+  state.previewOnlyMode = !state.previewOnlyMode;
+  addAudit(state.previewOnlyMode ? "Preview-only viewport opened." : "Preview-only viewport closed.");
+  saveState();
+  render();
+}
+
+function zoomViewport(delta) {
+  const next = Math.max(0.6, Math.min(1.6, Number(state.viewportZoom || 1) + delta));
+  state.viewportZoom = Math.round(next * 100) / 100;
+  saveState();
+  updateViewport();
+}
+
+function fitViewport() {
+  const shell = $("viewportShell");
+  const preview = $("preview");
+  if (!shell || !preview) return;
+  const shellWidth = Math.max(320, shell.clientWidth - 44);
+  const targetWidth = preview.offsetWidth || 790;
+  state.viewportZoom = Math.max(0.6, Math.min(1.25, Math.round((shellWidth / targetWidth) * 100) / 100));
+  saveState();
+  updateViewport();
+}
+
+function resetViewport() {
+  state.viewportZoom = 1;
+  saveState();
+  updateViewport();
+}
+
+function updateViewport() {
+  const preview = $("preview");
+  const readout = $("zoomReadout");
+  const zoom = Number(state.viewportZoom || 1);
+  if (preview) preview.style.setProperty("--viewport-zoom", zoom);
+  if (readout) readout.textContent = `${Math.round(zoom * 100)}%`;
 }
 
 function createPlan() {
@@ -1527,701 +2467,116 @@ function addToolComponent(type) {
   render();
 }
 
+function addInteractionPreset(kind) {
+  let source = getSelected();
+  if (!source || !["button", "input", "keypad", "workflow_trigger", "terminal_card"].includes(source.type)) {
+    source = state.components.find(item => ["button", "input", "keypad", "workflow_trigger", "terminal_card"].includes(item.type)) || state.components[0];
+  }
+  if (!source) {
+    addAudit("Add or apply a component before creating an interaction.");
+    return;
+  }
+  const presets = {
+    show_message: {
+      name: `When ${source.name} is used, show a message`,
+      trigger: source.type === "terminal_card" ? "command_entered" : "click",
+      action: { type: "show_message", label: "Show a friendly confirmation" }
+    },
+    save_input: {
+      name: `When ${source.name} is used, save the input`,
+      trigger: "click",
+      action: { type: "save_data", label: "Save the typed value" }
+    },
+    validate_input: {
+      name: `When ${source.name} is used, check the input`,
+      trigger: "click",
+      action: { type: "validate", label: "Check required fields before saving" }
+    }
+  };
+  const preset = presets[kind] || presets.show_message;
+  const nextFlow = flow(preset.name, preset.trigger, source.type, [preset.action]);
+  nextFlow.trigger.sourceId = source.id;
+  nextFlow.trigger.sourceName = source.name;
+  state.flows.push(nextFlow);
+  state.selectedComponentId = source.id;
+  state.level = Math.max(state.level, 3);
+  state.mode = "build";
+  addAudit("Interaction Agent added: " + preset.name);
+  saveState();
+  render();
+}
+
+function flowsForComponent(componentItem) {
+  if (!componentItem) return [];
+  return state.flows.filter(item =>
+    item.trigger.sourceId === componentItem.id ||
+    (!item.trigger.sourceId && item.trigger.sourceType === componentItem.type)
+  );
+}
+
+function updateFlow(flowId, path, value) {
+  const item = state.flows.find(flowItem => flowItem.id === flowId);
+  if (!item) return;
+  if (path === "name") item.name = value;
+  if (path === "trigger.type") item.trigger.type = value;
+  if (path === "action.type") item.actions[0].type = value;
+  if (path === "action.label") item.actions[0].label = value;
+  saveState();
+  renderModeDetail();
+  renderExportIfVisible();
+}
+
+function removeFlow(flowId) {
+  const item = state.flows.find(flowItem => flowItem.id === flowId);
+  state.flows = state.flows.filter(flowItem => flowItem.id !== flowId);
+  addAudit("Removed interaction: " + (item?.name || flowId));
+  saveState();
+  renderInspector();
+  renderModeDetail();
+  renderExportIfVisible();
+}
+
 function selectComponent(id) {
   state.selectedComponentId = id;
   saveState();
+  updatePreviewSelection();
   renderInspector();
-  renderPreview();
+  renderAiGuide();
+  renderLocalAgents();
+  renderFoundryGuide();
+  renderModeDetail();
+}
+
+let propAuditTimer = null;
+
+function queuePropAudit(name, key) {
+  clearTimeout(propAuditTimer);
+  propAuditTimer = setTimeout(() => addAudit("Updated " + name + " property: " + key), 450);
 }
 
 function updateProp(key, value) {
   const selected = getSelected();
   if (!selected) return;
   selected.props[key] = value;
-  addAudit("Updated " + selected.name + " property: " + key);
   saveState();
+  queuePropAudit(selected.name, key);
   renderPreview();
-  renderInspector();
   renderAiGuide();
+  renderFoundryGuide();
+  renderModeDetail();
   renderExportIfVisible();
 }
 
-function duplicateSelected() {
-  const selected = getSelected();
-  if (!selected) return;
-  const copy = JSON.parse(JSON.stringify(selected));
-  copy.id = uid("cmp");
-  copy.name = selected.name + " copy";
-  copy.createdAt = new Date().toISOString();
-  state.components.push(copy);
-  state.selectedComponentId = copy.id;
-  addAudit("Duplicated " + selected.name);
+function updateInlineProp(id, key, value) {
+  const item = state.components.find(component => component.id === id);
+  if (!item) return;
+  item.props[key] = value;
+  state.selectedComponentId = id;
   saveState();
-  render();
-}
-
-function removeSelected() {
-  const selected = getSelected();
-  if (!selected) return;
-  state.components = state.components.filter(item => item.id !== selected.id);
-  state.selectedComponentId = state.components[0]?.id || null;
-  addAudit("Removed " + selected.name);
-  saveState();
-  render();
-}
-
-function getSelected() {
-  return state.components.find(item => item.id === state.selectedComponentId) || null;
-}
-
-function render() {
-  document.body.classList.toggle("focus-mode", state.focusMode);
-  $("expertToggle").checked = state.expertMode;
-  $("focusToggle").checked = state.focusMode;
-  $("explainToggle").checked = state.explainMode;
-  $("projectName").value = state.projectName;
-  if (state.goal) $("goalInput").value = state.goal;
-  document.querySelectorAll(".mode-tabs button").forEach(button => {
-    button.classList.toggle("on", button.dataset.mode === state.mode);
-  });
-  $("modeBadge").textContent = state.mode;
-  renderPlan();
-  renderTemplates();
-  renderLevels();
-  renderTools();
-  renderPreview();
-  renderInspector();
+  updatePreviewSelection();
   renderAiGuide();
-  renderAudit();
-  renderTerminal();
-  renderModeDetail();
-  updateBadges();
+  renderFoundryGuide();
+  renderExportIfVisible();
 }
 
-function renderPlan() {
-  if (!state.plan) {
-    $("steps").innerHTML = `<div class="hint">No plan yet.</div>`;
-    return;
-  }
-  $("planSummary").textContent = state.plan.summary;
-  $("steps").innerHTML = state.plan.steps.map((step, index) => {
-    const active = index === state.plan.currentStepIndex;
-    const cls = step.completed ? "step done" : active ? "step active" : "step";
-    return `<div class="${cls}">
-      <span class="step-index">${index + 1}</span>
-      <div><b>${esc(step.title)}</b><br><span class="hint">${esc(step.description)}</span></div>
-    </div>`;
-  }).join("");
-}
-
-function renderTemplates() {
-  const filter = $("templateFilter")?.value || "all";
-  const recommended = new Set(state.plan?.recommendedTemplateIds || []);
-  const rows = TEMPLATES.filter(template => filter === "all" || template.category === filter)
-    .sort((a, b) => Number(recommended.has(b.id)) - Number(recommended.has(a.id)))
-    .map(template => {
-      const active = template.id === state.selectedTemplateId;
-      const rec = recommended.has(template.id) ? `<span class="badge good">recommended</span>` : "";
-      return `<div class="template-card ${active ? "active" : ""}" data-testid="template-${template.category}">
-        <h3>${esc(template.name)}</h3>
-        <p>${esc(template.description)}</p>
-        <div class="template-meta">
-          ${rec}
-          <span class="badge">${esc(template.difficulty)}</span>
-          <span class="badge">${esc(template.startingMode)}</span>
-        </div>
-        <button class="small primary" onclick="applyTemplate('${template.id}')">Apply Template</button>
-      </div>`;
-    });
-  $("templateList").innerHTML = rows.join("");
-}
-
-function renderLevels() {
-  document.querySelectorAll(".level").forEach(level => {
-    level.classList.toggle("active", Number(level.dataset.level) <= state.level);
-  });
-}
-
-function renderTools() {
-  const required = new Set(state.plan?.requiredTools.map(tool => tool.key) || []);
-  const visible = TOOL_LIBRARY.filter(tool => {
-    if (required.has(tool.key)) return true;
-    if (state.expertMode) return true;
-    return !tool.advanced && state.components.length > 0 && tool.level <= state.level;
-  });
-  const hiddenCount = TOOL_LIBRARY.length - visible.length;
-  $("hiddenToolsHint").textContent = state.plan
-    ? `${hiddenCount} hidden until relevant`
-    : "Plan first to filter tools.";
-
-  $("toolGrid").innerHTML = visible.map(tool => {
-    const locked = tool.advanced && !state.expertMode && !required.has(tool.key);
-    const relevant = required.has(tool.key);
-    return `<button class="tool-card ${locked ? "locked" : ""}" onclick="${locked ? "" : `addToolComponent('${tool.type}')`}" title="${esc(tool.reason)}">
-      <h3>${esc(tool.label)}</h3>
-      <p>${esc(tool.reason)}</p>
-      <strong>${relevant ? "relevant" : tool.phase}</strong>
-    </button>`;
-  }).join("") || `<div class="hint">No tools yet. Create a plan or apply a template.</div>`;
-}
-
-function renderPreview() {
-  const preview = $("preview");
-  if (!state.components.length) {
-    preview.innerHTML = `<div class="empty-canvas">
-      <div>
-        <b>Nothing on the build surface yet.</b><br>
-        Plan an idea, apply a template, or add one relevant tool.
-      </div>
-    </div>`;
-    return;
-  }
-  const template = TEMPLATES.find(item => item.id === state.selectedTemplateId);
-  if (template?.category === "phone_app") {
-    preview.innerHTML = `<div class="phone-frame"><div class="phone-screen">${state.components.map(renderComponent).join("")}</div></div>`;
-  } else if (template?.category === "calculator") {
-    preview.innerHTML = renderCalculator();
-  } else if (template?.category === "automation") {
-    preview.innerHTML = `<div class="workflow">${state.components.map(renderComponent).join("")}</div>`;
-  } else {
-    preview.innerHTML = state.components.map(renderComponent).join("");
-  }
-}
-
-function renderComponent(item) {
-  const selected = item.id === state.selectedComponentId ? " selected" : "";
-  const click = `onclick="selectComponent('${item.id}')"`;
-  if (item.type === "header") {
-    return `<article class="component-card page-header${selected}" ${click}>
-      <header>${esc(item.name)}</header>
-      <h3>${esc(item.props.title)}</h3>
-      <p>${esc(item.props.subtitle)}</p>
-    </article>`;
-  }
-  if (item.type === "text") {
-    return `<article class="component-card text-block${selected}" ${click}>
-      <header>${esc(item.name)}</header>${esc(item.props.text)}
-    </article>`;
-  }
-  if (item.type === "button") {
-    return `<article class="component-card button-block${selected}" ${click}>${esc(item.props.text)}</article>`;
-  }
-  if (item.type === "input") {
-    return `<article class="component-card input-block${selected}" ${click}>
-      <header>${esc(item.name)}</header>
-      <b>${esc(item.props.label)}</b>
-      <div class="fake-input">${esc(item.props.placeholder)}</div>
-    </article>`;
-  }
-  if (item.type === "image") {
-    return `<article class="component-card${selected}" ${click}>
-      <header>${esc(item.name)}</header>
-      <div style="height:140px;border:1px dashed var(--edge);border-radius:6px;display:grid;place-items:center;color:var(--muted)">
-        ${esc(item.props.label || "Image placeholder")}
-      </div>
-    </article>`;
-  }
-  if (item.type === "terminal_card") {
-    return `<article class="component-card${selected}" ${click}>
-      <header>${esc(item.props.title)}</header>
-      <pre style="white-space:pre-wrap;margin:0;color:var(--good)">$ ${esc(item.props.command)}\n${esc(item.props.result)}</pre>
-    </article>`;
-  }
-  if (item.type === "display") {
-    return `<article class="component-card${selected}" ${click}><header>${esc(item.name)}</header><div class="calc-display">${esc(item.props.value)}</div></article>`;
-  }
-  if (item.type === "keypad") {
-    const keys = String(item.props.keys || "").split(/\s+/).filter(Boolean);
-    return `<article class="component-card${selected}" ${click}><header>${esc(item.name)}</header><div class="calc-grid">${keys.map(key => `<div class="calc-key">${esc(key)}</div>`).join("")}</div></article>`;
-  }
-  if (item.type === "workflow_trigger" || item.type === "workflow_action") {
-    return `<article class="component-card${selected}" ${click}>
-      <header>${esc(item.name)}</header>
-      <h3>${esc(item.props.label)}</h3>
-      <p>${item.type === "workflow_trigger" ? "Starts the flow." : "Performs one visible step."}</p>
-    </article>`;
-  }
-  return `<article class="component-card${selected}" ${click}>
-    <header>${esc(item.name)}</header>
-    <h3>${esc(item.props.label || item.props.text || item.type)}</h3>
-    <p>${esc(item.props.description || "Concept block in the abstract model.")}</p>
-  </article>`;
-}
-
-function renderCalculator() {
-  const display = state.components.find(item => item.type === "display") || component("display");
-  const keypad = state.components.find(item => item.type === "keypad") || component("keypad");
-  const keys = String(keypad.props.keys || "").split(/\s+/).filter(Boolean);
-  return `<div class="calculator-shell">
-    <div class="calc-display" onclick="selectComponent('${display.id}')">${esc(display.props.value || "0")}</div>
-    <div class="calc-grid" onclick="selectComponent('${keypad.id}')">
-      ${keys.map(key => `<div class="calc-key">${esc(key)}</div>`).join("")}
-    </div>
-  </div>`;
-}
-
-function renderInspector() {
-  const selected = getSelected();
-  $("selectionBadge").textContent = selected ? selected.name : "none";
-  if (!selected) {
-    $("inspectorBody").className = "inspector-empty";
-    $("inspectorBody").innerHTML = "Select a component in the Build Space to edit its properties.";
-    return;
-  }
-  $("inspectorBody").className = "prop-grid";
-  const inputs = Object.entries(selected.props).map(([key, value]) => {
-    const val = typeof value === "object" ? JSON.stringify(value) : String(value);
-    const control = val.length > 48 || key === "text" || key === "keys"
-      ? `<textarea oninput="updateProp('${key}', this.value)">${esc(val)}</textarea>`
-      : `<input value="${esc(val)}" oninput="updateProp('${key}', this.value)">`;
-    return `<div><label>${esc(key)}</label>${control}</div>`;
-  }).join("");
-  $("inspectorBody").innerHTML = `
-    <div class="summary">
-      <b>${esc(selected.name)}</b><br>
-      Type: ${esc(selected.type)}<br>
-      Model ID: ${esc(selected.id)}
-    </div>
-    ${inputs}
-    <button class="small" onclick="explainSelected()">Explain this component</button>`;
-}
-
-function renderAiGuide() {
-  const guide = $("aiGuide");
-  const confidence = $("confidenceBar");
-  const confidenceText = $("confidenceText");
-  if (!state.plan) {
-    guide.textContent = "Start with an idea. The next useful action is to create a KISS plan.";
-    confidence.style.width = "72%";
-    confidenceText.textContent = "confidence: 72 percent";
-    return;
-  }
-  if (!state.selectedTemplateId) {
-    const template = TEMPLATES.find(item => item.id === state.plan.recommendedTemplateIds[0]);
-    guide.textContent = `Apply the ${template.name} template. It matches the goal and unlocks a starter structure without showing unrelated tools.`;
-    confidence.style.width = "84%";
-    confidenceText.textContent = "confidence: 84 percent";
-    return;
-  }
-  const step = state.plan.steps[state.plan.currentStepIndex];
-  const selected = getSelected();
-  guide.textContent = selected
-    ? `Selected ${selected.name}. Tune its copy or advance the step when the preview communicates the goal.`
-    : `Current step: ${step?.title || "Review"}. Keep the workspace focused on that one step.`;
-  confidence.style.width = "79%";
-  confidenceText.textContent = "confidence: 79 percent";
-}
-
-function explainSelected() {
-  const selected = getSelected();
-  if (!selected) return;
-  const explanation = explainComponent(selected);
-  addTerminalRecord({
-    input: "explain " + selected.type,
-    status: "simulated",
-    resultText: explanation,
-    explanation: "Explain mode maps UI pieces back to concepts, not syntax.",
-    whatIf: "If this were connected to an AI explainer service, this card would be generated from the selected abstract model object.",
-    suggestedNextActions: ["Advance Step", "Export Model"],
-    filesystemChanges: []
-  });
-}
-
-function explainComponent(item) {
-  const map = {
-    header: "A header anchors the user's understanding of the screen.",
-    text: "A text block explains context without adding interaction complexity.",
-    button: "A button is an action affordance. Keep the label specific.",
-    input: "An input collects user data. It usually needs validation later.",
-    display: "A display is output state. It should be separate from the calculation logic.",
-    keypad: "A keypad is an input control group. Each key can become an event source.",
-    terminal_card: "A terminal card represents a safe command simulation record.",
-    workflow_trigger: "A trigger starts a workflow. It should be concrete and testable.",
-    workflow_action: "An action does one thing. Split multi-step work into separate actions."
-  };
-  return map[item.type] || "This is a concept block in the abstract model. It can translate to different runtimes later.";
-}
-
-function renderAudit() {
-  $("auditList").innerHTML = state.audit.map(item => `<div class="audit-item">${esc(item.ts)} - ${esc(item.message)}</div>`).join("")
-    || `<div class="hint">No actions yet.</div>`;
-}
-
-function clearAudit() {
-  state.audit = [];
-  saveState();
-  renderAudit();
-}
-
-function updateBadges() {
-  const template = TEMPLATES.find(item => item.id === state.selectedTemplateId);
-  $("workspaceTitle").textContent = state.mode === "plan" ? "Plan before tools" : state.mode === "build" ? "Guided Build Space" : state.mode === "test" ? "Test and Simulate" : "Export and Translate";
-  $("workspaceSub").textContent = state.plan ? state.plan.goal : "Goal first, tools second. Complexity appears only when it is useful.";
-  $("templateBadge").textContent = template ? template.name : "no template";
-  $("componentBadge").textContent = `${state.components.length} components`;
-}
-
-function renderModeDetail() {
-  const box = $("modeDetail");
-  if (state.mode === "plan") {
-    box.innerHTML = `<div class="model-graph">
-      <div class="model-card"><b>User Layer</b><span>Goal, planner, tools, preview, guide.</span></div>
-      <div class="model-card"><b>Abstract Logic Layer</b><span>Components, events, actions, data, constraints.</span></div>
-      <div class="model-card"><b>Runtime Layer</b><span>HTML, scripts, workflows, or future translators.</span></div>
-    </div>`;
-  } else if (state.mode === "build") {
-    box.innerHTML = `<div class="summary">Build mode keeps the center on components and preview. Use the inspector for property edits and the terminal for safe experiments.</div>`;
-  } else if (state.mode === "test") {
-    box.innerHTML = `<div class="field-row">
-      <div class="row" style="justify-content:space-between">
-        <label style="margin:0">Prototype checks</label>
-        <button class="small primary" onclick="runChecks(true)">Run Checks</button>
-      </div>
-      <div id="checkList" class="check-list"></div>
-    </div>`;
-    renderChecks();
-  } else if (state.mode === "export") {
-    box.innerHTML = `<div class="export-area">
-      <div class="row">
-        <button class="small primary" onclick="exportModel()">Refresh model JSON</button>
-        <button class="small" onclick="downloadModel()">Download JSON</button>
-        <button class="small" onclick="copyExport()">Copy JSON</button>
-      </div>
-      <textarea id="exportText" readonly></textarea>
-      <label>Starter HTML translator output</label>
-      <textarea id="htmlExportText" readonly></textarea>
-    </div>`;
-    exportModel(false);
-  }
-}
-
-let lastChecks = [];
-
-function runChecks(writeAudit = true) {
-  lastChecks = [
-    {
-      pass: !!state.plan,
-      label: "Goal can create a plan",
-      detail: state.plan ? "Plan object exists with steps and tool recommendations." : "Create a plan from the left panel."
-    },
-    {
-      pass: !!state.selectedTemplateId,
-      label: "Template can be applied",
-      detail: state.selectedTemplateId ? "A starter template is active." : "Apply one of the suggested templates."
-    },
-    {
-      pass: state.components.length > 0,
-      label: "Build surface updates",
-      detail: `${state.components.length} component(s) are currently rendered.`
-    },
-    {
-      pass: state.terminal.history.length > 0,
-      label: "Terminal simulation records history",
-      detail: state.terminal.history.length ? "At least one simulated command has been recorded." : "Run `mkdir project` or `help` in the terminal."
-    },
-    {
-      pass: state.flows.length > 0,
-      label: "Abstract flows exist",
-      detail: state.flows.length ? `${state.flows.length} flow(s) can be exported.` : "Apply a template or add an event."
-    }
-  ];
-  if (writeAudit) addAudit("Ran prototype checks.");
-  renderChecks();
-}
-
-function renderChecks() {
-  const list = $("checkList");
-  if (!list) return;
-  const checks = lastChecks.length ? lastChecks : [];
-  list.innerHTML = checks.map(check => `<div class="check ${check.pass ? "pass" : "warn"}">
-    <span>${check.pass ? "PASS" : "TODO"}</span>
-    <div><b>${esc(check.label)}</b><br>${esc(check.detail)}</div>
-  </div>`).join("") || `<div class="hint">Checks have not run yet.</div>`;
-}
-
-function exportModel(announce = true) {
-  const model = {
-    project: {
-      id: "prototype-project",
-      name: state.projectName,
-      goal: state.plan?.goal || $("goalInput").value.trim(),
-      mode: state.mode,
-      templateId: state.selectedTemplateId,
-      level: state.level,
-      updatedAt: new Date().toISOString()
-    },
-    plan: state.plan,
-    components: state.components,
-    flows: state.flows,
-    runtimeState: {
-      selectedComponentId: state.selectedComponentId,
-      focusModeEnabled: state.focusMode,
-      explainModeEnabled: state.explainMode,
-      aiAutonomyLevel: "suggest"
-    },
-    terminal: {
-      cwd: state.terminal.cwd,
-      history: state.terminal.history
-    }
-  };
-  const json = JSON.stringify(model, null, 2);
-  if ($("exportText")) $("exportText").value = json;
-  if ($("htmlExportText")) $("htmlExportText").value = translateToHtml();
-  if (announce) {
-    state.mode = "export";
-    addAudit("Exported abstract model.");
-    saveState();
-    render();
-  }
-  return json;
-}
-
-function renderExportIfVisible() {
-  if ($("exportText")) exportModel(false);
-}
-
-function translateToHtml() {
-  const body = state.components.map(item => {
-    if (item.type === "header") return `<header><h1>${esc(item.props.title)}</h1><p>${esc(item.props.subtitle)}</p></header>`;
-    if (item.type === "text") return `<p>${esc(item.props.text)}</p>`;
-    if (item.type === "button") return `<button>${esc(item.props.text)}</button>`;
-    if (item.type === "input") return `<label>${esc(item.props.label)}<input placeholder="${esc(item.props.placeholder)}"></label>`;
-    if (item.type === "image") return `<div role="img" aria-label="${esc(item.props.alt)}">${esc(item.props.label)}</div>`;
-    return `<section data-component="${esc(item.type)}">${esc(item.props.label || item.props.text || item.name)}</section>`;
-  }).join("\n  ");
-  return `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>${esc(state.projectName)}</title>
-</head>
-<body>
-  ${body || "<!-- Add components first. -->"}
-</body>
-</html>`;
-}
-
-function downloadModel() {
-  const blob = new Blob([exportModel(false)], { type: "application/json" });
-  const url = URL.createObjectURL(blob);
-  const anchor = document.createElement("a");
-  anchor.href = url;
-  anchor.download = "builder-studio-model.json";
-  anchor.click();
-  URL.revokeObjectURL(url);
-  addAudit("Downloaded model JSON.");
-}
-
-async function copyExport() {
-  const text = exportModel(false);
-  try {
-    await navigator.clipboard.writeText(text);
-    addAudit("Copied model JSON to clipboard.");
-  } catch {
-    addAudit("Clipboard copy unavailable in this browser context.");
-  }
-}
-
-function runTerminal() {
-  const input = $("termInput").value.trim();
-  if (!input) return;
-  $("termInput").value = "";
-  const record = simulateCommand(input);
-  addTerminalRecord(record);
-}
-
-function addTerminalRecord(record) {
-  record.id = record.id || uid("cmd");
-  record.createdAt = record.createdAt || new Date().toISOString();
-  state.terminal.history.push(record);
-  state.terminal.history = state.terminal.history.slice(-40);
-  saveState();
-  renderTerminal();
-  renderModeDetail();
-}
-
-function simulateCommand(input) {
-  const [cmdRaw, ...args] = input.split(/\s+/);
-  const cmd = (cmdRaw || "").toLowerCase();
-  const fail = message => ({
-    input,
-    status: "blocked",
-    resultText: message,
-    explanation: "The simulator only supports a safe command subset.",
-    whatIf: "A real terminal might mutate files or call programs. This prototype blocks anything outside the safe set.",
-    suggestedNextActions: ["help"],
-    filesystemChanges: []
-  });
-
-  if (cmd === "help") {
-    return {
-      input,
-      status: "simulated",
-      resultText: "Commands: pwd, ls, cd, mkdir, touch, cat, tree, scaffold, clear, help",
-      explanation: "The help command lists the sandbox-only command set.",
-      whatIf: "In a real CLI this would print documentation. Here it also teaches the supported boundary.",
-      suggestedNextActions: ["pwd", "ls", "mkdir project"],
-      filesystemChanges: []
-    };
-  }
-  if (cmd === "clear") {
-    state.terminal.history = [];
-    return {
-      input,
-      status: "simulated",
-      resultText: "Terminal history cleared.",
-      explanation: "Only the visible simulated history was cleared.",
-      whatIf: "No files were changed.",
-      suggestedNextActions: ["help"],
-      filesystemChanges: []
-    };
-  }
-  if (cmd === "pwd") {
-    return record(input, state.terminal.cwd, "Shows the current sandbox directory.", "A real terminal would print the working directory.", []);
-  }
-  if (cmd === "ls") {
-    const node = getNode(state.terminal.cwd);
-    if (!node || node.type !== "dir") return fail("Current directory not found.");
-    const names = Object.entries(node.children).map(([name, child]) => child.type === "dir" ? name + "/" : name);
-    return record(input, names.join("\n") || "(empty)", "Lists only the in-memory sandbox directory.", "A real terminal would read files from disk. This one reads a JS object.", []);
-  }
-  if (cmd === "tree") {
-    return record(input, treeText(state.terminal.fs), "Shows the simulated directory tree.", "A real tree command would scan disk. This one prints the sandbox model.", []);
-  }
-  if (cmd === "cd") {
-    const target = args[0] || "/";
-    const next = resolvePath(target);
-    const node = getNode(next);
-    if (!node || node.type !== "dir") return fail("Directory not found: " + target);
-    state.terminal.cwd = next;
-    return record(input, "Changed directory to " + next, "Changes only the sandbox cwd.", "A real terminal would change the shell process cwd.", []);
-  }
-  if (cmd === "mkdir") {
-    const name = safeName(args[0]);
-    if (!name) return fail("Usage: mkdir <name>");
-    const node = getNode(state.terminal.cwd);
-    if (node.children[name]) return fail("Path already exists: " + name);
-    node.children[name] = { type: "dir", children: {} };
-    return record(input, "Directory created: " + joinPath(state.terminal.cwd, name), "Creates a directory in the fake filesystem.", "If run for real, a folder would be created on disk.", [{ type: "create", path: joinPath(state.terminal.cwd, name), objectType: "directory" }], ["cd " + name, "touch index.html"]);
-  }
-  if (cmd === "touch") {
-    const name = safeName(args[0]);
-    if (!name) return fail("Usage: touch <file>");
-    const node = getNode(state.terminal.cwd);
-    node.children[name] = node.children[name] || { type: "file", content: "" };
-    return record(input, "File ready: " + joinPath(state.terminal.cwd, name), "Creates or refreshes a file in memory.", "If run for real, a file timestamp could change or a new file could appear.", [{ type: "create", path: joinPath(state.terminal.cwd, name), objectType: "file" }], ["cat " + name, "ls"]);
-  }
-  if (cmd === "cat") {
-    const target = args[0];
-    if (!target) return fail("Usage: cat <file>");
-    const node = getNode(resolvePath(target));
-    if (!node || node.type !== "file") return fail("File not found: " + target);
-    return record(input, node.content || "(empty file)", "Reads a file from the sandbox model.", "A real cat command would print the file from disk.", []);
-  }
-  if (cmd === "scaffold") {
-    const kind = (args[0] || "").toLowerCase();
-    const template = TEMPLATES.find(t => t.category.includes(kind) || t.slug.includes(kind) || t.name.toLowerCase().includes(kind));
-    if (!template) return fail("Usage: scaffold webpage|phone|calculator|cli|automation");
-    applyTemplate(template.id);
-    return record(input, "Applied template: " + template.name, "Scaffold maps to a safe template operation.", "A real scaffold command could create many files. Here it only changes the in-page abstract model.", [{ type: "update", path: "abstract-model", objectType: "template" }], ["export model", "tree"]);
-  }
-  return fail("Blocked unsupported command: " + cmdRaw);
-}
-
-function record(input, resultText, explanation, whatIf, filesystemChanges = [], suggestedNextActions = ["ls"]) {
-  return {
-    input,
-    status: "simulated",
-    resultText,
-    explanation: state.explainMode ? explanation : "",
-    whatIf: state.explainMode ? whatIf : "",
-    suggestedNextActions,
-    filesystemChanges
-  };
-}
-
-function safeName(value) {
-  if (!value || value.includes("/") || value.includes("\\") || value === "." || value === "..") return "";
-  return value.replace(/[^\w.-]/g, "");
-}
-
-function joinPath(base, name) {
-  return base === "/" ? "/" + name : base + "/" + name;
-}
-
-function resolvePath(path) {
-  if (!path || path === ".") return state.terminal.cwd;
-  const parts = (path.startsWith("/") ? path : joinPath(state.terminal.cwd, path)).split("/");
-  const stack = [];
-  for (const part of parts) {
-    if (!part || part === ".") continue;
-    if (part === "..") stack.pop();
-    else stack.push(part);
-  }
-  return "/" + stack.join("/");
-}
-
-function getNode(path) {
-  if (path === "/") return state.terminal.fs;
-  const parts = path.split("/").filter(Boolean);
-  let node = state.terminal.fs;
-  for (const part of parts) {
-    if (!node.children || !node.children[part]) return null;
-    node = node.children[part];
-  }
-  return node;
-}
-
-function treeText(node, prefix = "") {
-  const entries = Object.entries(node.children || {});
-  if (!entries.length) return prefix ? "" : "/";
-  return entries.map(([name, child]) => {
-    const label = prefix + (child.type === "dir" ? name + "/" : name);
-    return child.type === "dir"
-      ? label + "\n" + treeText(child, prefix + "  ")
-      : label;
-  }).join("\n").trim();
-}
-
-function renderTerminal() {
-  $("cwdBadge").textContent = state.terminal.cwd;
-  $("promptPath").textContent = state.terminal.cwd + " $";
-  $("termHistory").innerHTML = state.terminal.history.map(item => `
-    <div class="log-card">
-      <div class="cmd">$ ${esc(item.input)} <span class="badge ${item.status === "blocked" ? "warn" : "good"}">${esc(item.status)}</span></div>
-      <div class="result">${esc(item.resultText)}</div>
-      ${item.explanation ? `<div class="explain"><b>Why:</b> ${esc(item.explanation)}<br><b>What-if:</b> ${esc(item.whatIf)}</div>` : ""}
-      ${item.suggestedNextActions?.length ? `<div class="next-actions">${item.suggestedNextActions.map(action => `<button class="small" onclick="fillTerminal('${esc(action)}')">${esc(action)}</button>`).join("")}</div>` : ""}
-    </div>
-  `).join("") || `<div class="hint">No commands yet. Try help or mkdir project.</div>`;
-  $("termHistory").scrollTop = $("termHistory").scrollHeight;
-  $("filesystemView").textContent = "/\n" + treeText(state.terminal.fs, "  ");
-}
-
-function fillTerminal(command) {
-  $("termInput").value = command;
-  $("termInput").focus();
-}
-
-function resetPrototype() {
-  if (!confirm("Reset the Builder Studio prototype state?")) return;
-  localStorage.removeItem("builder-studio-prototype");
-  state = createInitialState();
-  $("goalInput").value = "I want to build a simple landing page with a signup button";
-  saveState();
-  render();
-}
-
-$("termInput").addEventListener("keydown", event => {
-  if (event.key === "Enter") runTerminal();
-});
-
-$("goalInput").addEventListener("keydown", event => {
-  if ((event.ctrlKey || event.metaKey) && event.key === "Enter") createPlan();
-});
-
-render();
-</script>
-</body>
-</html>
+function fin

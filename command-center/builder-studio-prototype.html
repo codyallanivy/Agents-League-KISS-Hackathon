@@ -794,6 +794,8 @@
     font-family: var(--component-font, var(--page-font, var(--font-ui)));
   }
 
+  .component-card.page-header h3,
+  .component-card.page-header p,
   .preview .component-card.page-header h3,
   .preview .component-card.page-header p,
   .preview .component-card.text-block,
@@ -944,6 +946,29 @@
     margin: 0;
     color: var(--ink);
     font-size: 12px;
+  }
+
+  .component-style-panel.active {
+    border-color: rgba(142, 230, 168, 0.55);
+    background: rgba(142, 230, 168, 0.07);
+  }
+
+  .editor-section-title {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 2px;
+  }
+
+  .quick-help {
+    border: 1px solid rgba(244, 185, 78, 0.42);
+    border-radius: 6px;
+    padding: 8px;
+    background: rgba(244, 185, 78, 0.08);
+    color: var(--ink);
+    font-size: 11px;
+    line-height: 1.45;
   }
 
   .component-card.input-block {
@@ -1698,7 +1723,10 @@
 
       <div class="workflow-nav" aria-label="Build workflow navigation">
         <button class="small" id="prevModeButton" onclick="goWorkflowMode(-1)">Previous</button>
-        <div class="workflow-steps" id="workflowSteps"></div>
+        <div>
+          <div class="hint" style="margin-bottom:5px">Workflow: move forward or back anytime.</div>
+          <div class="workflow-steps" id="workflowSteps"></div>
+        </div>
         <button class="small primary" id="nextModeButton" onclick="goWorkflowMode(1)">Next</button>
       </div>
 
@@ -1744,6 +1772,7 @@
               <button class="small" onclick="zoomViewport(0.1)">Zoom +</button>
               <button class="small" onclick="fitViewport()">Fit</button>
               <button class="small" onclick="resetViewport()">100%</button>
+              <button class="small" onclick="showInspectorPanel()">Show Inspector</button>
               <button class="small" onclick="duplicateSelected()">Duplicate</button>
               <button class="small" onclick="removeSelected()">Remove</button>
             </div>
@@ -2284,10 +2313,12 @@ function setUniformComponentStyle(enabled) {
   state.uniformComponentStyle = enabled;
   if (!enabled) {
     const selected = getSelected() || state.components[0];
+    state.components.forEach(item => {
+      seedComponentStyle(item);
+      item.styles.useGlobal = false;
+    });
     if (selected) {
       state.selectedComponentId = selected.id;
-      seedComponentStyle(selected);
-      selected.styles.useGlobal = false;
     }
   }
   addAudit(enabled ? "Uniform component styling enabled." : "Individual component styling enabled.");
@@ -2358,6 +2389,14 @@ function resizePanel(name, delta) {
   updatePanelLayout();
 }
 
+function showInspectorPanel() {
+  if (!state.panels) state.panels = createInitialState().panels;
+  state.panels.inspector = false;
+  if (!state.selectedComponentId && state.components.length) state.selectedComponentId = state.components[0].id;
+  saveState();
+  render();
+}
+
 function updatePanelLayout() {
   if (!state.panels) state.panels = createInitialState().panels;
   if (!state.panelSizes) state.panelSizes = createInitialState().panelSizes;
@@ -2396,6 +2435,11 @@ function toggleTutorial() {
 
 function togglePreviewOnly() {
   state.previewOnlyMode = !state.previewOnlyMode;
+  if (state.previewOnlyMode) {
+    if (!state.panels) state.panels = createInitialState().panels;
+    state.panels.inspector = false;
+    if (!state.selectedComponentId && state.components.length) state.selectedComponentId = state.components[0].id;
+  }
   addAudit(state.previewOnlyMode ? "Preview-only viewport opened." : "Preview-only viewport closed.");
   saveState();
   render();
@@ -3091,8 +3135,11 @@ function renderSelectedStyleControls(selected) {
   if (state.uniformComponentStyle) {
     return `
       <div class="component-style-panel">
-        <h3>Selected Block Style</h3>
-        <p class="hint">Uniform styling is on. Use Web Style for all cards/buttons, or turn off Uniform components to edit this block by itself.</p>
+        <div class="editor-section-title">
+          <h3>Selected Block Style</h3>
+          <span class="badge">uniform</span>
+        </div>
+        <p class="quick-help">Uniform styling is on, so global Web Style changes affect every card and button. Turn off "Keep cards and buttons uniform" to edit this selected block by itself.</p>
       </div>`;
   }
   const useCustom = !selected.styles.useGlobal;
@@ -3111,11 +3158,15 @@ function renderSelectedStyleControls(selected) {
     ["Cascadia Code, Consolas, monospace", "Code / terminal"]
   ];
   return `
-    <div class="component-style-panel">
-      <h3>Selected Block Style</h3>
+    <div class="component-style-panel ${useCustom ? "active" : ""}">
+      <div class="editor-section-title">
+        <h3>Selected Block Style</h3>
+        <span class="badge ${useCustom ? "good" : ""}">${useCustom ? "individual" : "global"}</span>
+      </div>
+      <p class="quick-help">${useCustom ? "Individual styling is active. These swatches change only the selected block, not every card or button." : "This block follows global Web Style values. Turn on individual styling for this block to override it."}</p>
       <label class="field-toggle">
         <input type="checkbox" ${useCustom ? "checked" : ""} onchange="setComponentCustomStyle(this.checked)">
-        Style this block separately
+        Edit only this selected block
       </label>
       ${useCustom ? `
         <div class="style-grid">
@@ -3206,6 +3257,9 @@ function renderInspector() {
         <b>Nothing selected yet.</b><br>
         Click a block in the Build Space. Its editable fields will appear here.
       </div>
+      <div class="quick-help">
+        The Inspector is where you edit individual card colors, text, and Behavior and Interactions. Select a block to reveal those controls.
+      </div>
       <button class="small primary" onclick="selectFirstComponent()">Select first block</button>`;
     return;
   }
@@ -3222,7 +3276,7 @@ function renderInspector() {
       <b>${esc(selected.name)}</b><br>
       Type: ${esc(selected.type)}<br>
       Model ID: ${esc(selected.id)}<br>
-      Beginner move: edit one field, then add one interaction.
+      Edit this block's text, individual style, and behavior below.
     </div>
     ${inputs}
     ${renderSelectedStyleControls(selected)}

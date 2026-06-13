@@ -22,7 +22,7 @@ TIER1_TYPES = {"cover": 1, "logo": 1, "palette": 1, "banner": 2, "mockup": 2,
 SESSION_CAP_IMAGES = 12
 SESSION_CAP_USD = 2.00
 VERIFICATION_CAP = 8
-COST_PER_IMAGE = {"offline-svg": 0.0, "foundry-image": 0.04}
+COST_PER_IMAGE = {"offline-svg": 0.0, "foundry-svg": 0.01, "foundry-image": 0.04}
 
 
 class AssetGovernor:

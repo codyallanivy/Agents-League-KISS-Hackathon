@@ -9,6 +9,7 @@ Run:  python server.py   →  http://localhost:8765
 """
 
 import json
+import os
 import re
 import subprocess
 import sys
@@ -357,9 +358,266 @@ def assets():
     for d in [proj() / "assets", proj() / "vision"]:
         if d.exists():
             for f in sorted(d.iterdir()):
-                if f.suffix in (".svg", ".png"):
+                if f.suffix in (".svg", ".png", ".jpg", ".jpeg"):
                     out.append(f"/pfile?p={f.relative_to(proj()).as_posix()}")
     return out
+
+
+def azure_asset_capabilities():
+    image_deployment = os.getenv("AZURE_AI_IMAGE_DEPLOYMENT", "").strip()
+    has_endpoint = bool(os.getenv("AZURE_AI_PROJECT_ENDPOINT", "").strip()
+                        or os.getenv("AZURE_OPENAI_ENDPOINT", "").strip())
+    return {
+        "foundry_text": CTX.model.mode.startswith("foundry:"),
+        "foundry_svg": CTX.model.mode.startswith("foundry:"),
+        "azure_image": bool(image_deployment and has_endpoint),
+        "image_deployment": image_deployment,
+        "video": bool(os.getenv("AZURE_AI_VIDEO_DEPLOYMENT", "").strip()),
+    }
+
+
+def project_reference_text(project_dir=None, limit=1800):
+    d = project_dir or proj()
+    doc = creation_doc(d)
+    parts = [
+        ("PROJECT_STATE", read(d / "PROJECT_STATE.md")[:450]),
+        ("VISION", (read(d / "PRODUCT_VISION.md") or read(d / "agile" / "PRODUCT_VISION.md"))[:650]),
+        ("CREATION", read(doc)[:550]),
+        ("DECISIONS", read(d / "DECISIONS.md")[:350]),
+    ]
+    text = "\n".join(f"{label}:\n{body}" for label, body in parts if body.strip())
+    return text[:limit]
+
+
+def reference_hits_for_project(query, project_dir, top_k=5):
+    d = project_dir or proj()
+    project_prefix = d.name + "/"
+    results = [g for g in CTX.foundry_iq.retrieve(query, top_k=80)
+               if not fantasy_hit(g)]
+    filtered = [g for g in results
+                if hit_source(g).startswith(project_prefix) or shared_hit(g)]
+    if filtered:
+        return filtered[:top_k]
+    return shared_method_refs(query, top_k=top_k)
+
+
+def asset_reference_brief(kind, prompt_txt, project_dir=None, title=""):
+    """Search project/scoped IQ references before asset generation."""
+    d = project_dir or proj()
+    title = title or d.name
+    query = f"{kind} {prompt_txt} {title}"
+    iq_hits = reference_hits_for_project(query, d, top_k=5)
+    project_refs = project_reference_text(d)
+    existing = ", ".join(Path(a.split("p=")[1]).name for a in assets()) if d == proj() else ""
+    azure = azure_asset_capabilities()
+    brief = {
+        "kind": kind,
+        "prompt": prompt_txt,
+        "project": d.name,
+        "mode": CTX.model.mode,
+        "azure": azure,
+        "citations": [h["citation"] for h in iq_hits],
+        "summary": "",
+        "resource_opportunities": [],
+    }
+    if CTX.model.mode != "offline":
+        raw = CTX.model.complete(
+            "You are an asset research assistant. Before generation, search the "
+            "provided project memory and produce a compact reference brief. Use "
+            "only this project's memory plus shared method notes; do not import "
+            "other project content. Return JSON only with keys: summary, "
+            "visual_prompt, resource_opportunities. resource_opportunities is an "
+            "array of useful Azure-capable asset forms such as image, slide, "
+            "short video concept, diagram, mockup, or brand card. Keep it practical.",
+            "REQUEST:\n"
+            f"- asset kind: {kind}\n- user prompt: {prompt_txt}\n- project: {title}\n"
+            f"- existing assets: {existing or 'none'}\n\n"
+            "PROJECT REFERENCES:\n"
+            f"{project_refs}\n\n"
+            "SCOPED IQ HITS:\n"
+            + "\n".join(f"[{h['citation']}] {h['snippet'][:220]}" for h in iq_hits))
+        try:
+            s = raw[raw.index("{"):raw.rindex("}") + 1]
+            parsed = json.loads(s)
+            brief["summary"] = str(parsed.get("summary", ""))[:700]
+            brief["visual_prompt"] = str(parsed.get("visual_prompt", ""))[:1400]
+            ros = parsed.get("resource_opportunities") or []
+            brief["resource_opportunities"] = [str(x)[:100] for x in ros[:6]]
+        except Exception:
+            brief["summary"] = (raw or "")[:700]
+    if not brief.get("visual_prompt"):
+        brief["visual_prompt"] = (
+            f"{kind} asset for {title}. User request: {prompt_txt}. "
+            f"Use this project context only: {project_refs[:900]}. "
+            "Clean, useful, original, no real people, no unrelated themes."
+        )
+    if not brief["resource_opportunities"]:
+        brief["resource_opportunities"] = ["image", "diagram", "brand card"]
+    ref_dir = d / "assets"
+    ref_dir.mkdir(exist_ok=True)
+    ref_file = ref_dir / "ASSET_REFERENCES.md"
+    with open(ref_file, "a", encoding="utf-8") as fh:
+        fh.write(f"\n## {time.strftime('%Y-%m-%d %H:%M')} — {kind}: {prompt_txt[:80]}\n")
+        fh.write(f"- Model tier: {CTX.model.mode}\n")
+        fh.write(f"- Azure image deployment: {azure['image_deployment'] or 'not configured'}\n")
+        fh.write(f"- Summary: {brief['summary'] or '(deterministic local brief)'}\n")
+        fh.write(f"- Opportunities: {', '.join(brief['resource_opportunities'])}\n")
+        if brief["citations"]:
+            fh.write("- References:\n" + "".join(f"  - {c}\n" for c in brief["citations"]))
+    CTX.tracer.log(agent="AssetReferenceSearch", model=CTX.model.mode,
+                   prompt={"asset_type": kind, "user": prompt_txt},
+                   grounding=brief["citations"],
+                   output={"answer": brief["summary"],
+                           "opportunities": brief["resource_opportunities"],
+                           "azure": azure},
+                   extra={"project": d.name})
+    return brief
+
+
+def try_azure_image_asset(prompt_txt, out_path):
+    """Generate a PNG through a configured Azure OpenAI/Foundry image deployment."""
+    deployment = os.getenv("AZURE_AI_IMAGE_DEPLOYMENT", "").strip()
+    api_version = os.getenv("AZURE_OPENAI_IMAGE_API_VERSION", "2025-04-01-preview")
+    if not deployment:
+        return None, "AZURE_AI_IMAGE_DEPLOYMENT is not configured"
+    try:
+        import base64
+        endpoint = os.getenv("AZURE_AI_PROJECT_ENDPOINT", "").strip()
+        if endpoint:
+            from azure.ai.projects import AIProjectClient
+            from azure.identity import DefaultAzureCredential
+            client = AIProjectClient(endpoint=endpoint, credential=DefaultAzureCredential())
+            openai = client.get_openai_client(api_version=api_version)
+        else:
+            from openai import AzureOpenAI
+            openai = AzureOpenAI(
+                azure_endpoint=os.environ["AZURE_OPENAI_ENDPOINT"].strip(),
+                api_key=os.getenv("AZURE_OPENAI_KEY", ""),
+                api_version=api_version)
+        try:
+            r = openai.images.generate(model=deployment, prompt=prompt_txt[:3900],
+                                       n=1, size="1024x1024", quality="medium",
+                                       output_format="png")
+        except TypeError:
+            r = openai.images.generate(model=deployment, prompt=prompt_txt[:3900],
+                                       n=1, size="1024x1024")
+        item = r.data[0]
+        b64 = getattr(item, "b64_json", None)
+        if b64:
+            out_path.write_bytes(base64.b64decode(b64))
+            return out_path, None
+        url = getattr(item, "url", None)
+        if url:
+            with urllib.request.urlopen(url, timeout=120) as resp:
+                out_path.write_bytes(resp.read())
+            return out_path, None
+        return None, "Azure image response did not include b64_json or url"
+    except Exception as exc:
+        return None, f"{type(exc).__name__}: {exc}"
+
+
+def try_foundry_svg_asset(kind, prompt_txt, ref, out_path):
+    if not CTX.model.mode.startswith("foundry:"):
+        return None, "Foundry text model is not active"
+    raw = CTX.model.complete(
+        "You are a precise SVG designer for a no-code builder gallery. Create "
+        "one original, useful SVG asset. Requirements: valid standalone SVG, "
+        "width 400 height 300, no scripts, no external images, no real people, "
+        "no copyrighted logos, no fantasy/RPG motifs unless the active project "
+        "explicitly asks for them. Return ONLY the <svg>...</svg> markup.",
+        "ASSET REQUEST:\n"
+        f"- kind: {kind}\n- user prompt: {prompt_txt}\n\n"
+        "REFERENCE BRIEF:\n"
+        f"{ref.get('summary')}\n\nVISUAL PROMPT:\n{ref.get('visual_prompt')}")
+    raw = (raw or "").strip()
+    if "<svg" not in raw or "</svg>" not in raw:
+        return None, "Foundry did not return valid SVG"
+    raw = raw[raw.index("<svg"):]
+    raw = raw[:raw.rindex("</svg>") + 6]
+    out_path.write_text(raw, encoding="utf-8")
+    return out_path, None
+
+
+def generate_gallery_asset(kind, prompt_txt, project_dir=None, title="", seed="", gov=None):
+    from asset_governor import AssetGovernor as _AG
+    import intake_studio as ist
+    d = project_dir or proj()
+    title = title or d.name
+    kind = kind if kind in ist.ASSET_KINDS else "cover"
+    ref = asset_reference_brief(kind, prompt_txt, project_dir=d, title=title)
+    azure = azure_asset_capabilities()
+    mode = "foundry-image" if azure["azure_image"] else (
+        "foundry-svg" if azure["foundry_svg"] else "offline-svg")
+    gov = gov or _AG(d)
+    decision = gov.check(kind, prompt_txt, mode=mode)
+    if decision["verdict"] == "BLOCK":
+        gov.park(kind, prompt_txt, decision["reasons"])
+        return {"error": "Governor: BLOCK — " + "; ".join(decision["reasons"]),
+                "reference_brief": ref, "verdict": decision["verdict"]}
+    asset_dir = d / "assets"
+    asset_dir.mkdir(exist_ok=True)
+    n = 1
+    if mode == "foundry-image":
+        while (asset_dir / f"{kind}-{n}.png").exists():
+            n += 1
+        p = asset_dir / f"{kind}-{n}.png"
+        image_prompt = (
+            f"{ref['visual_prompt']}\n\n"
+            "Make it useful as a gallery asset for a web/app builder. No text in "
+            "the image unless essential. Original content only. No real people."
+        )
+        made, err = try_azure_image_asset(image_prompt, p)
+        if made:
+            gov.record_generation(kind, made.name, decision["estimated_cost_usd"])
+            return {"ok": True, "file": made.name, "mode": mode,
+                    "verdict": decision["verdict"],
+                    "note": decision["reasons"][0] if decision["reasons"] else "",
+                    "references_used": ref["citations"],
+                    "resource_opportunities": ref["resource_opportunities"],
+                    "reference_summary": ref["summary"]}
+        ref["azure_error"] = err
+        mode = "foundry-svg" if azure["foundry_svg"] else "offline-svg"
+        decision = gov.check(kind, prompt_txt, mode=mode)
+        if decision["verdict"] == "BLOCK":
+            gov.park(kind, prompt_txt, decision["reasons"])
+            return {"error": "Governor: BLOCK — " + "; ".join(decision["reasons"]),
+                    "reference_brief": ref, "verdict": decision["verdict"]}
+    if mode == "foundry-svg":
+        while (asset_dir / f"{kind}-{n}.svg").exists():
+            n += 1
+        p = asset_dir / f"{kind}-{n}.svg"
+        made, err = try_foundry_svg_asset(kind, prompt_txt, ref, p)
+        if made:
+            gov.record_generation(kind, made.name, decision["estimated_cost_usd"])
+            return {"ok": True, "file": made.name, "mode": mode,
+                    "verdict": decision["verdict"],
+                    "note": decision["reasons"][0] if decision["reasons"] else "",
+                    "references_used": ref["citations"],
+                    "resource_opportunities": ref["resource_opportunities"],
+                    "reference_summary": ref["summary"]}
+        ref["foundry_svg_error"] = err
+        mode = "offline-svg"
+        decision = gov.check(kind, prompt_txt, mode=mode)
+        if decision["verdict"] == "BLOCK":
+            gov.park(kind, prompt_txt, decision["reasons"])
+            return {"error": "Governor: BLOCK — " + "; ".join(decision["reasons"]),
+                    "reference_brief": ref, "verdict": decision["verdict"]}
+    while (asset_dir / f"{kind}-{n}.svg").exists():
+        n += 1
+    p = asset_dir / f"{kind}-{n}.svg"
+    ad = art_direction(d)
+    pal = ist.palette_for(ad["tone"])
+    label = (ref.get("summary") or prompt_txt)[:36]
+    ist.svg_asset(kind, label, pal, p, seed=(seed or d.name) + prompt_txt)
+    gov.record_generation(kind, p.name, decision["estimated_cost_usd"])
+    return {"ok": True, "file": p.name, "mode": mode,
+            "verdict": decision["verdict"],
+            "note": decision["reasons"][0] if decision["reasons"] else "",
+            "references_used": ref["citations"],
+            "resource_opportunities": ref["resource_opportunities"],
+            "reference_summary": ref["summary"],
+            "azure_error": ref.get("azure_error", ""),
+            "foundry_svg_error": ref.get("foundry_svg_error", "")}
 
 
 def traces(q=""):
@@ -713,15 +971,17 @@ class H(BaseHTTPRequestHandler):
                 self._json({"error": "not found"}, 404)
         elif u.path == "/pfile":
             f = (proj() / qs.get("p", [""])[0]).resolve()
-            if f.is_file() and proj().resolve() in f.parents and f.suffix in (".svg", ".png"):
-                self._file(f, "image/svg+xml" if f.suffix == ".svg" else "image/png")
+            if f.is_file() and proj().resolve() in f.parents and f.suffix in (".svg", ".png", ".jpg", ".jpeg"):
+                mime = "image/svg+xml" if f.suffix == ".svg" else ("image/png" if f.suffix == ".png" else "image/jpeg")
+                self._file(f, mime)
             else:
                 self._json({"error": "not found"}, 404)
         elif u.path == "/api/status":
             self._json({"model": CTX.model.mode, "models": model_options(),
                         "chunks": len(CTX.foundry_iq.chunks),
                         "trace_file": CTX.tracer.path.name,
-                        "projects": list(PROJECTS), "active": ACTIVE})
+                        "projects": list(PROJECTS), "active": ACTIVE,
+                        "azure_assets": azure_asset_capabilities()})
         elif u.path == "/api/browse":
             self._json(browse(qs.get("path", [""])[0]))
         elif u.path == "/api/calendar.ics":
@@ -868,26 +1128,14 @@ class H(BaseHTTPRequestHandler):
         elif self.path == "/api/add-asset":
             kind = data.get("kind", "cover").strip().lower()
             prompt_txt = data.get("prompt", "").strip() or kind
-            from asset_governor import AssetGovernor as _AG
             import intake_studio as ist
             kind = kind if kind in ist.ASSET_KINDS else "cover"
-            gov = _AG(proj())
-            d = gov.check(kind, prompt_txt)
-            if d["verdict"] == "BLOCK":
-                gov.park(kind, prompt_txt, d["reasons"])
-                self._json({"error": "Governor: BLOCK — " + "; ".join(d["reasons"])}, 400)
+            result = generate_gallery_asset(kind, prompt_txt, project_dir=proj(),
+                                            title=proj().name, seed=ACTIVE)
+            if result.get("error"):
+                self._json(result, 400)
             else:
-                ad = art_direction()
-                pal = ist.palette_for(ad["tone"])
-                (proj() / "assets").mkdir(exist_ok=True)
-                n = 1
-                while (proj() / "assets" / f"{kind}-{n}.svg").exists():
-                    n += 1
-                p = proj() / "assets" / f"{kind}-{n}.svg"
-                ist.svg_asset(kind, prompt_txt[:36], pal, p, seed=ACTIVE + prompt_txt)
-                gov.record_generation(kind, p.name, d["estimated_cost_usd"])
-                self._json({"ok": True, "file": p.name, "verdict": d["verdict"],
-                            "note": d["reasons"][0] if d["reasons"] else ""})
+                self._json(result)
         elif self.path == "/api/verify-assets":
             pv = proj() / "PENDING_VERIFICATION.md"
             n = 0
@@ -1026,7 +1274,6 @@ class H(BaseHTTPRequestHandler):
             # --- asset kit: plan from what THIS project needs, grounded ---------
             from asset_governor import AssetGovernor as _AG
             gov = _AG(out)
-            pal = ist.palette_for(a["tone"])
             (out / "assets").mkdir(exist_ok=True)
             doc_heads = ", ".join(re.findall(r"^#{2,3} (.+)$", prose, re.M)[:6])
             asset_refs = (f"IDEA: {idea[:160]}\nMUST-HAVE: {a['must_have']}\n"
@@ -1055,14 +1302,14 @@ class H(BaseHTTPRequestHandler):
 
             log = []
             for kind, prompt in reqs:
-                d = gov.check(kind, prompt)
-                log.append(f"{d['verdict']} {kind}: {prompt[:40]}")
-                if d["verdict"] == "ACCEPT":
-                    p = out / "assets" / f"{kind}-{gov.counts.get(kind, 0) + 1}.svg"
-                    ist.svg_asset(kind, prompt[:36], pal, p, seed=a["title_seed"])
-                    gov.record_generation(kind, p.name, d["estimated_cost_usd"])
-                elif d["verdict"] == "BLOCK":
-                    gov.park(kind, prompt, d["reasons"])
+                result = generate_gallery_asset(kind, prompt, project_dir=out,
+                                                title=title, seed=a["title_seed"],
+                                                gov=gov)
+                if result.get("error"):
+                    log.append(f"BLOCK {kind}: {prompt[:40]}")
+                else:
+                    log.append(f"{result.get('verdict', 'ACCEPT')} {kind}: "
+                               f"{prompt[:40]} via {result.get('mode', 'offline-svg')}")
 
             PROJECTS = discover_projects()
             PROJECTS.update(load_registry())

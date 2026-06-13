@@ -469,13 +469,18 @@ async function newProject(){
   alert("Project '" + r.active + "' created with the KISS memory files — set its vision tiers, then build.");
 }
 async function addAsset(){
-  const kind = prompt("Asset type — cover, logo, palette, banner, mockup, diagram, or card:", "cover");
+  const kind = prompt("Asset type — cover, logo, palette, banner, mockup, diagram, or card. Foundry will search references first and choose the best generation path:", "cover");
   if(!kind) return;
   const p = prompt("Describe it (one line):", "");
   if(p === null) return;
   const r = await (await fetch("/api/add-asset",{method:"POST",body:JSON.stringify({kind:kind.trim(), prompt:p})})).json();
   if(r.error){ alert(r.error); return; }
   loadGallery(); loadHealth();
+  alert("Generated " + r.file + " via " + (r.mode || "offline-svg")
+    + "\n\nReference search: " + ((r.references_used||[]).length || 0) + " scoped hit(s)"
+    + "\nOpportunities: " + ((r.resource_opportunities||[]).join(", ") || "image, diagram, brand card")
+    + (r.azure_error ? "\n\nAzure image fallback: " + r.azure_error : "")
+    + (r.foundry_svg_error ? "\n\nFoundry SVG fallback: " + r.foundry_svg_error : ""));
 }
 async function verifyAssets(){
   const r = await (await fetch("/api/verify-assets",{method:"POST",body:"{}"})).json();

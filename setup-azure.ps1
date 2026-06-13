@@ -36,12 +36,20 @@ foreach ($m in $models) {
 }
 if (-not $deployed) { Write-Host "No chat model deployable - paste this output to Claude." -ForegroundColor Red; exit 1 }
 
-# optional image model (fine if it fails)
-az cognitiveservices account deployment create -g $rg -n $name `
-    --deployment-name dall-e-3 --model-name dall-e-3 --model-version "3.0" `
-    --model-format OpenAI --sku-name Standard --sku-capacity 1 --only-show-errors 2>&1 | Out-Null
-$img = if ($LASTEXITCODE -eq 0) { "dall-e-3" } else { "" }
-Write-Host ("Image model: " + ($(if ($img) {"dall-e-3 deployed"} else {"not available (fine - SVG tier keeps working)"})))
+# optional image model (fine if it fails; Foundry SVG tier still improves assets).
+# DALL-E 3 is retired in Azure OpenAI as of 2026-03-04; use gpt-image-*.
+$img = ""
+$imageModels = @(
+    @{n="gpt-image-1"; v="2025-04-15"; d="gpt-image-1"}
+)
+foreach ($m in $imageModels) {
+    Write-Host "Trying image model $($m.n) ..." -ForegroundColor Cyan
+    az cognitiveservices account deployment create -g $rg -n $name `
+        --deployment-name $m.d --model-name $m.n --model-version $m.v `
+        --model-format OpenAI --sku-name Standard --sku-capacity 1 --only-show-errors 2>&1 | Out-Null
+    if ($LASTEXITCODE -eq 0) { $img = $m.d; Write-Host "  deployed $($m.d)!" -ForegroundColor Green; break }
+}
+Write-Host ("Image model: " + ($(if ($img) {$img + " deployed"} else {"not available (fine - Foundry SVG/SVG tiers keep working; deploy gpt-image-* manually in Foundry if needed)"})))
 
 $endpoint = az cognitiveservices account show -n $name -g $rg --query properties.endpoint -o tsv
 $key = az cognitiveservices account keys list -n $name -g $rg --query key1 -o tsv
@@ -52,6 +60,8 @@ AZURE_OPENAI_ENDPOINT=$endpoint
 AZURE_OPENAI_KEY=$key
 AZURE_AI_MODEL_DEPLOYMENT=$deployed
 AZURE_AI_IMAGE_DEPLOYMENT=$img
+AZURE_OPENAI_IMAGE_API_VERSION=2025-04-01-preview
+AZURE_AI_VIDEO_DEPLOYMENT=
 "@ | Out-File -Encoding ascii $envPath
 
 Write-Host "`n== DONE ==" -ForegroundColor Green

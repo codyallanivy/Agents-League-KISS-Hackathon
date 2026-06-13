@@ -11,6 +11,13 @@ import re
 from pathlib import Path
 
 
+def is_excluded_source(path: Path) -> bool:
+    for p in (path.parent, *path.parents):
+        if p.name == "fantasy-template" or (p / ".fantasy").exists():
+            return True
+    return False
+
+
 class FoundryIQ:
     def __init__(self, source_dirs):
         self.chunks = []  # {source, heading, text}
@@ -22,6 +29,8 @@ class FoundryIQ:
                 self._index_file(f)
 
     def _index_file(self, path: Path):
+        if is_excluded_source(path):
+            return
         text = path.read_text(encoding="utf-8", errors="replace")
         # source includes the parent folder so projects never blur together
         self._src = f"{path.parent.name}/{path.name}" if path.parent.name not in ("knowledge",) else path.name

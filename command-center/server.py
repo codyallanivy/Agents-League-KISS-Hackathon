@@ -30,13 +30,92 @@ from iq.fabric_iq import FabricIQ                                     # noqa: E4
 from iq.work_iq import WorkIQ                                         # noqa: E402
 
 T2 = ROOT / "foundry-track2"
+FANTASY_TEMPLATE = ROOT / "creative-track1" / "fantasy-template"
+LEGACY_FANTASY_MARKERS = (
+    "current snapshot of the campaign build",
+    "playable 3-session campaign",
+    "named npcs",
+    "tabletop-rpg",
+    "drowned shrine",
+    "greyharbor",
+)
+
+
+def path_is_under(path: Path, parent: Path) -> bool:
+    try:
+        path.resolve().relative_to(parent.resolve())
+        return True
+    except (OSError, ValueError):
+        return False
+
+
+def looks_like_legacy_fantasy_project(d: Path) -> bool:
+    """Detect old generated campaign outputs before the intake became neutral."""
+    if (d / "CREATION.md").exists():
+        return False
+    hay = []
+    for name in ("PROJECT_STATE.md", "PRODUCT_VISION.md", "CAMPAIGN.md"):
+        p = d / name
+        if p.exists():
+            hay.append(p.read_text(encoding="utf-8", errors="replace")[:4000].lower())
+    joined = "\n".join(hay)
+    return any(marker in joined for marker in LEGACY_FANTASY_MARKERS)
 
 
 def is_fantasy(d: Path) -> bool:
     """A dir flagged as isolated fantasy-template output. These are never
     discovered or indexed, so the optional fantasy template cannot influence
     any other project's planning or grounded output."""
-    return (d / ".fantasy").exists()
+    return (
+        (d / ".fantasy").exists()
+        or path_is_under(d, FANTASY_TEMPLATE)
+        or looks_like_legacy_fantasy_project(d)
+    )
+
+
+def fantasy_citation(citation: str) -> bool:
+    """Block stale in-memory citations from old fantasy/chunk indexes."""
+    c = (citation or "").lower()
+    return any(marker in c for marker in (
+        "ember-tides/",
+        "ember-roast/",
+        "pizza-website/",
+        "fantasy-template/",
+    ))
+
+
+def fantasy_hit(hit: dict) -> bool:
+    c = (hit.get("citation") or "").lower()
+    if fantasy_citation(c):
+        return True
+    body = f"{c}\n{hit.get('snippet', '')}".lower()
+    return "campaign.md" in c and any(marker in body for marker in LEGACY_FANTASY_MARKERS)
+
+
+def safe_index_project(d: Path):
+    if is_fantasy(d):
+        return 0
+    count = 0
+    for f in sorted(d.rglob("*.md")):
+        if path_is_under(f, FANTASY_TEMPLATE):
+            continue
+        CTX.foundry_iq._index_file(f)
+        count += 1
+    return count
+
+
+def output_project_dir(seed: str) -> Path:
+    slug = re.sub(r"[^a-z0-9 _-]", "", (seed or "new project").lower()).strip()
+    slug = re.sub(r"\s+", "-", slug) or "new-project"
+    base = ROOT / "creative-track1" / "output" / slug
+    if not base.exists() or not is_fantasy(base):
+        return base
+    n = 2
+    while True:
+        candidate = ROOT / "creative-track1" / "output" / f"{slug}-{n}"
+        if not candidate.exists():
+            return candidate
+        n += 1
 
 
 def discover_projects():
@@ -61,7 +140,7 @@ def load_registry():
     out = {}
     for name, p in saved.items():
         d = Path(p)
-        if d.is_dir() and (d / "PROJECT_STATE.md").exists():
+        if d.is_dir() and (d / "PROJECT_STATE.md").exists() and not is_fantasy(d):
             out[name] = d
     return out
 
@@ -291,7 +370,8 @@ def retrieve_for_mode(query, mode="project", top_k=4):
     from FoundryIQ are prefixed with the project folder, so the ACTIVE + "/" gate
     is exact.) This is what stops, e.g., creative content surfacing inside an
     unrelated project's planning answers."""
-    results = CTX.foundry_iq.retrieve(query, top_k=25)
+    results = [g for g in CTX.foundry_iq.retrieve(query, top_k=25)
+               if not fantasy_hit(g)]
     if mode == "global":
         return results[:top_k]
     core = ["kiss_certification_guide.md", "context_health_policy.md"]
@@ -635,6 +715,10 @@ class H(BaseHTTPRequestHandler):
             d = Path(data.get("path", "").strip().strip('"'))
             if not d.is_dir():
                 self._json({"error": "Folder not found: " + str(d)}, 400)
+            elif is_fantasy(d):
+                self._json({"error": "That folder is isolated fantasy-template output, "
+                            "so it is not indexed into normal projects. Use start.bat "
+                            "option 3 when you want the fantasy template on purpose."}, 400)
             elif not (d / "PROJECT_STATE.md").exists():
                 mds = sorted(f.name for f in d.glob("*.md"))[:8]
                 self._json({"offer_init": True, "path": str(d),
@@ -650,8 +734,7 @@ class H(BaseHTTPRequestHandler):
                     name += "_2"
                 PROJECTS[name] = d
                 save_registry()
-                for f in sorted(d.rglob("*.md")):
-                    CTX.foundry_iq._index_file(f)  # ground the new project's knowledge
+                safe_index_project(d)  # ground the new project's knowledge
                 ACTIVE = name
                 CTX.tracer.log(agent="CommandCenter", phase="add_project",
                                output={"name": name, "path": str(d)})
@@ -660,6 +743,9 @@ class H(BaseHTTPRequestHandler):
             d = Path(data.get("path", "").strip().strip('"'))
             if not d.is_dir():
                 self._json({"error": "Folder not found: " + str(d)}, 400)
+            elif is_fantasy(d):
+                self._json({"error": "That folder is reserved for isolated fantasy-template "
+                            "output and cannot be initialized as a normal KISS project."}, 400)
             else:
                 created = scaffold_kiss(d)
                 name = d.name
@@ -667,8 +753,7 @@ class H(BaseHTTPRequestHandler):
                     name += "_2"
                 PROJECTS[name] = d
                 save_registry()
-                for f in sorted(d.rglob("*.md")):
-                    CTX.foundry_iq._index_file(f)
+                safe_index_project(d)
                 ACTIVE = name
                 CTX.tracer.log(agent="CommandCenter", phase="init_project",
                                output={"name": name, "created": created})
@@ -701,12 +786,15 @@ class H(BaseHTTPRequestHandler):
                 self._json({"error": "give the project a name"}, 400)
             else:
                 d = ROOT / "creative-track1" / "output" / name.lower().replace(" ", "-")
+                if d.exists() and is_fantasy(d):
+                    self._json({"error": "That project name points at isolated fantasy-template "
+                                "output. Choose a fresh project name for the neutral builder."}, 400)
+                    return
                 d.mkdir(parents=True, exist_ok=True)
                 created = scaffold_kiss(d)
                 PROJECTS = globals()["PROJECTS"]
                 PROJECTS[d.name] = d
-                for f in sorted(d.rglob("*.md")):
-                    CTX.foundry_iq._index_file(f)
+                safe_index_project(d)
                 ACTIVE = d.name
                 globals()["ACTIVE"] = d.name
                 self._json({"active": d.name, "created": created, "projects": list(PROJECTS)})
@@ -838,13 +926,14 @@ class H(BaseHTTPRequestHandler):
                  "audience": answers[4] or "the intended audience",
                  "must_have": answers[2] or idea[:60],
                  "off_limits": answers[3] or "nothing specified yet"}
-            out = ROOT / "creative-track1" / "output" / a["title_seed"].replace(" ", "-")
+            out = output_project_dir(a["title_seed"])
             title = ist.scaffold_project(a, out)
 
             # --- REFERENCE GROUNDING (search before generating) -----------------
             # 1) the project's own intake signal; 2) related approved knowledge.
             qa_lines = "\n".join(f"Q: {x.get('q','')}\nA: {x.get('a','')}" for x in qa if x.get("a"))
-            kb_hits = CTX.foundry_iq.retrieve(idea, top_k=3)
+            kb_hits = [h for h in CTX.foundry_iq.retrieve(idea, top_k=20)
+                       if not fantasy_hit(h)][:3]
             kb_refs = "\n".join(f"[{h['citation']}] {h['snippet'][:200]}" for h in kb_hits)
             references = (f"INTAKE ANSWERS:\n{qa_lines or '- (none)'}\n\n"
                           f"MUST-HAVE (Tier 1): {a['must_have']}\n"
@@ -911,8 +1000,7 @@ class H(BaseHTTPRequestHandler):
             PROJECTS = discover_projects()
             PROJECTS.update(load_registry())
             ACTIVE = out.name
-            for f in sorted(out.rglob("*.md")):
-                CTX.foundry_iq._index_file(f)
+            safe_index_project(out)
             self._json({"active": ACTIVE, "title": title, "words": len(prose.split()),
                         "governance": log, "references_used": [h["citation"] for h in kb_hits],
                         "projects": list(PROJECTS)})

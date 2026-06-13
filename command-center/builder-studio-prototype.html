@@ -721,10 +721,12 @@
     min-height: min(52vh, 520px);
     overflow: hidden;
     display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(280px, var(--canvas-inspector-width, 340px));
     grid-template-rows: auto minmax(0, 1fr);
   }
 
   .canvas-toolbar {
+    grid-column: 1 / -1;
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -751,6 +753,8 @@
   }
 
   .viewport-shell {
+    grid-column: 1;
+    grid-row: 2;
     overflow: auto;
     min-height: 0;
     background:
@@ -869,7 +873,7 @@
   .component-card.page-header h3 {
     font-size: 26px;
     margin: 0 0 5px;
-    color: var(--ink);
+    color: var(--component-text, var(--page-text, var(--ink)));
   }
 
   .component-card.text-block {
@@ -1058,6 +1062,88 @@
     color: var(--muted);
     font-size: 12px;
     line-height: 1.5;
+  }
+
+  .canvas-inspector {
+    grid-column: 2;
+    grid-row: 2;
+    min-width: 0;
+    border-left: 1px solid var(--edge-soft);
+    background: rgba(15, 13, 10, 0.94);
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+
+  .canvas-inspector-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 9px;
+    border-bottom: 1px solid var(--edge-soft);
+    background: rgba(38, 33, 22, 0.56);
+  }
+
+  .canvas-inspector-head h3 {
+    margin: 0;
+    color: var(--gold);
+    font-size: 11px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+  }
+
+  .canvas-inspector-body {
+    overflow: auto;
+    padding: 10px;
+    display: grid;
+    gap: 10px;
+    align-content: start;
+  }
+
+  .canvas-inspector .prop-grid {
+    gap: 8px;
+  }
+
+  .canvas-inspector-note {
+    border: 1px solid rgba(137, 215, 207, 0.38);
+    border-radius: 6px;
+    padding: 8px;
+    background: rgba(137, 215, 207, 0.08);
+    color: var(--ink);
+    font-size: 11px;
+    line-height: 1.45;
+  }
+
+  .quick-toolbar {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px;
+  }
+
+  .canvas-inspector-collapsed .canvas-wrap {
+    grid-template-columns: minmax(0, 1fr) 48px;
+  }
+
+  .canvas-inspector-collapsed .canvas-inspector {
+    overflow: hidden;
+  }
+
+  .canvas-inspector-collapsed .canvas-inspector-body,
+  .canvas-inspector-collapsed .canvas-inspector .resize-button,
+  .canvas-inspector-collapsed #canvasSelectionBadge {
+    display: none;
+  }
+
+  .canvas-inspector-collapsed .canvas-inspector-head {
+    height: 100%;
+    flex-direction: column;
+    justify-content: flex-start;
+    padding: 8px 4px;
+  }
+
+  .canvas-inspector-collapsed .canvas-inspector-head h3 {
+    writing-mode: vertical-rl;
+    text-orientation: mixed;
   }
 
   .prop-grid {
@@ -1606,6 +1692,24 @@
 
     .canvas-wrap {
       min-height: 520px;
+      grid-template-columns: 1fr;
+      grid-template-rows: auto minmax(480px, 1fr) auto;
+    }
+
+    .viewport-shell,
+    .canvas-inspector {
+      grid-column: 1;
+    }
+
+    .viewport-shell {
+      grid-row: 2;
+    }
+
+    .canvas-inspector {
+      grid-row: 3;
+      border-left: 0;
+      border-top: 1px solid var(--edge-soft);
+      min-height: 320px;
     }
 
     .viewport-grid {
@@ -1772,6 +1876,8 @@
               <button class="small" onclick="zoomViewport(0.1)">Zoom +</button>
               <button class="small" onclick="fitViewport()">Fit</button>
               <button class="small" onclick="resetViewport()">100%</button>
+              <button class="small" onclick="focusSelected()">Focus Selected</button>
+              <button class="small" onclick="toggleCanvasInspector()">Right Editor</button>
               <button class="small" onclick="showInspectorPanel()">Show Inspector</button>
               <button class="small" onclick="duplicateSelected()">Duplicate</button>
               <button class="small" onclick="removeSelected()">Remove</button>
@@ -1782,6 +1888,20 @@
               <div id="preview" class="preview" data-testid="preview"></div>
             </div>
           </div>
+          <aside class="canvas-inspector" id="canvasInspector" aria-label="Canvas component editor">
+            <div class="canvas-inspector-head">
+              <h3>Right Editor</h3>
+              <div class="panel-head-controls">
+                <button class="small resize-button" onclick="resizePanel('canvasInspector', -40)" title="Narrow right editor">-</button>
+                <button class="small resize-button" onclick="resizePanel('canvasInspector', 40)" title="Widen right editor">+</button>
+                <span class="badge" id="canvasSelectionBadge">none</span>
+                <button class="small panel-collapse-button" id="canvasInspectorCollapseButton" onclick="toggleCanvasInspector()" title="Minimize right editor">-</button>
+              </div>
+            </div>
+            <div class="canvas-inspector-body" id="canvasInspectorBody">
+              <div class="inspector-empty">Select a component in the canvas to edit it here.</div>
+            </div>
+          </aside>
         </section>
 
         <section id="modeDetail"></section>
@@ -2164,10 +2284,12 @@ function createInitialState() {
     panels: {
       planner: false,
       inspector: false,
-      terminal: false
+      terminal: false,
+      canvasInspector: false
     },
     panelSizes: {
-      inspector: 310
+      inspector: 310,
+      canvasInspector: 340
     },
     styles: {
       font: "Inter, Aptos, Segoe UI, Arial, sans-serif",
@@ -2187,6 +2309,7 @@ function createInitialState() {
     selectedComponentId: null,
     codeDraft: "",
     codeDirty: false,
+    canvasAssistantLast: "",
     audit: [],
     terminal: {
       cwd: "/",
@@ -2306,6 +2429,7 @@ function updateStyle(key, value) {
   state.styles[key] = value;
   saveState();
   updatePreviewStyles();
+  renderCanvasInspectorStatus();
   renderExportIfVisible();
 }
 
@@ -2325,6 +2449,7 @@ function setUniformComponentStyle(enabled) {
   saveState();
   renderPreview();
   renderInspector();
+  renderCanvasInspector();
   renderStyleControls();
   renderExportIfVisible();
 }
@@ -2351,12 +2476,15 @@ function seedComponentStyle(item) {
 function setComponentCustomStyle(enabled) {
   const selected = getSelected();
   if (!selected) return;
+  if (enabled) state.uniformComponentStyle = false;
   seedComponentStyle(selected);
   selected.styles.useGlobal = !enabled;
   addAudit(enabled ? "Selected block now has individual styling." : "Selected block now follows global styling.");
   saveState();
   renderPreview();
   renderInspector();
+  renderCanvasInspector();
+  renderStyleControls();
   renderExportIfVisible();
 }
 
@@ -2370,6 +2498,7 @@ function updateComponentStyle(key, value) {
   saveState();
   renderPreview();
   renderStyleControls();
+  renderCanvasInspectorStatus();
   renderExportIfVisible();
 }
 
@@ -2381,10 +2510,16 @@ function togglePanel(name) {
 }
 
 function resizePanel(name, delta) {
-  if (name !== "inspector") return;
   if (!state.panelSizes) state.panelSizes = createInitialState().panelSizes;
-  const current = Number(state.panelSizes.inspector || 310);
-  state.panelSizes.inspector = Math.max(260, Math.min(520, current + delta));
+  if (name === "inspector") {
+    const current = Number(state.panelSizes.inspector || 310);
+    state.panelSizes.inspector = Math.max(260, Math.min(520, current + delta));
+  } else if (name === "canvasInspector") {
+    const current = Number(state.panelSizes.canvasInspector || 340);
+    state.panelSizes.canvasInspector = Math.max(240, Math.min(560, current + delta));
+  } else {
+    return;
+  }
   saveState();
   updatePanelLayout();
 }
@@ -2392,9 +2527,21 @@ function resizePanel(name, delta) {
 function showInspectorPanel() {
   if (!state.panels) state.panels = createInitialState().panels;
   state.panels.inspector = false;
+  state.panels.canvasInspector = false;
   if (!state.selectedComponentId && state.components.length) state.selectedComponentId = state.components[0].id;
   saveState();
   render();
+}
+
+function toggleCanvasInspector() {
+  if (!state.panels) state.panels = createInitialState().panels;
+  state.panels.canvasInspector = !state.panels.canvasInspector;
+  if (!state.panels.canvasInspector && !state.selectedComponentId && state.components.length) {
+    state.selectedComponentId = state.components[0].id;
+  }
+  saveState();
+  updatePanelLayout();
+  renderCanvasInspector();
 }
 
 function updatePanelLayout() {
@@ -2403,14 +2550,18 @@ function updatePanelLayout() {
   document.body.classList.toggle("planner-collapsed", !!state.panels.planner);
   document.body.classList.toggle("inspector-collapsed", !!state.panels.inspector);
   document.body.classList.toggle("terminal-collapsed", !!state.panels.terminal);
+  document.body.classList.toggle("canvas-inspector-collapsed", !!state.panels.canvasInspector);
   const shell = $("shell");
   if (shell) shell.style.setProperty("--inspector-width", `${state.panelSizes.inspector || 310}px`);
+  if (shell) shell.style.setProperty("--canvas-inspector-width", `${state.panelSizes.canvasInspector || 340}px`);
   const plannerButton = $("plannerCollapseButton");
   const inspectorButton = $("inspectorCollapseButton");
   const terminalButton = $("terminalCollapseButton");
+  const canvasInspectorButton = $("canvasInspectorCollapseButton");
   if (plannerButton) plannerButton.textContent = state.panels.planner ? "+" : "-";
   if (inspectorButton) inspectorButton.textContent = state.panels.inspector ? "+" : "-";
   if (terminalButton) terminalButton.textContent = state.panels.terminal ? "+" : "-";
+  if (canvasInspectorButton) canvasInspectorButton.textContent = state.panels.canvasInspector ? "+" : "-";
 }
 
 function updatePreviewStyles() {
@@ -2438,6 +2589,7 @@ function togglePreviewOnly() {
   if (state.previewOnlyMode) {
     if (!state.panels) state.panels = createInitialState().panels;
     state.panels.inspector = false;
+    state.panels.canvasInspector = false;
     if (!state.selectedComponentId && state.components.length) state.selectedComponentId = state.components[0].id;
   }
   addAudit(state.previewOnlyMode ? "Preview-only viewport opened." : "Preview-only viewport closed.");
@@ -2467,6 +2619,25 @@ function resetViewport() {
   state.viewportZoom = 1;
   saveState();
   updateViewport();
+}
+
+function focusSelected() {
+  const selected = getSelected();
+  if (!selected) {
+    selectFirstComponent();
+    fitViewport();
+    return;
+  }
+  const node = document.querySelector(`[data-component-id="${selected.id}"]`);
+  const shell = $("viewportShell");
+  if (node && shell) {
+    node.scrollIntoView({ block: "center", inline: "center", behavior: "smooth" });
+  }
+  if (!state.panels) state.panels = createInitialState().panels;
+  state.panels.canvasInspector = false;
+  saveState();
+  updatePanelLayout();
+  renderCanvasInspector();
 }
 
 function updateViewport() {
@@ -2657,6 +2828,7 @@ function updateFlow(flowId, path, value) {
   if (path === "action.type") item.actions[0].type = value;
   if (path === "action.label") item.actions[0].label = value;
   saveState();
+  renderCanvasInspectorStatus();
   renderModeDetail();
   renderExportIfVisible();
 }
@@ -2667,6 +2839,7 @@ function removeFlow(flowId) {
   addAudit("Removed interaction: " + (item?.name || flowId));
   saveState();
   renderInspector();
+  renderCanvasInspector();
   renderModeDetail();
   renderExportIfVisible();
 }
@@ -2676,6 +2849,7 @@ function selectComponent(id) {
   saveState();
   updatePreviewSelection();
   renderInspector();
+  renderCanvasInspector();
   renderAiGuide();
   renderLocalAgents();
   renderFoundryGuide();
@@ -2709,6 +2883,7 @@ function updateInlineProp(id, key, value) {
   state.selectedComponentId = id;
   saveState();
   updatePreviewSelection();
+  renderCanvasInspectorStatus();
   renderAiGuide();
   renderFoundryGuide();
   renderExportIfVisible();
@@ -2719,6 +2894,7 @@ function finishInlineEdit(id, key) {
   if (!item) return;
   addAudit("Edited " + item.name + " on the build surface.");
   renderInspector();
+  renderCanvasInspector();
   renderModeDetail();
 }
 
@@ -2788,6 +2964,7 @@ function render() {
   renderTools();
   renderPreview();
   renderInspector();
+  renderCanvasInspector();
   renderAiGuide();
   renderLocalAgents();
   renderFoundryGuide();
@@ -3130,19 +3307,10 @@ function renderCalculator() {
   </div>`;
 }
 
-function renderSelectedStyleControls(selected) {
+function renderSelectedStyleControls(selected, idPrefix = "component") {
   selected.styles = { ...componentStyleDefaults(), ...(selected.styles || {}) };
-  if (state.uniformComponentStyle) {
-    return `
-      <div class="component-style-panel">
-        <div class="editor-section-title">
-          <h3>Selected Block Style</h3>
-          <span class="badge">uniform</span>
-        </div>
-        <p class="quick-help">Uniform styling is on, so global Web Style changes affect every card and button. Turn off "Keep cards and buttons uniform" to edit this selected block by itself.</p>
-      </div>`;
-  }
-  const useCustom = !selected.styles.useGlobal;
+  const useCustom = !state.uniformComponentStyle && !selected.styles.useGlobal;
+  const showSwatches = true;
   const styleValues = {
     font: selected.styles.font || fallbackComponentStyle("font"),
     panel: selected.styles.panel || fallbackComponentStyle("panel"),
@@ -3161,40 +3329,46 @@ function renderSelectedStyleControls(selected) {
     <div class="component-style-panel ${useCustom ? "active" : ""}">
       <div class="editor-section-title">
         <h3>Selected Block Style</h3>
-        <span class="badge ${useCustom ? "good" : ""}">${useCustom ? "individual" : "global"}</span>
+        <span class="badge ${useCustom ? "good" : ""}">${state.uniformComponentStyle ? "uniform" : useCustom ? "individual" : "global"}</span>
       </div>
-      <p class="quick-help">${useCustom ? "Individual styling is active. These swatches change only the selected block, not every card or button." : "This block follows global Web Style values. Turn on individual styling for this block to override it."}</p>
+      <p class="quick-help">${
+        state.uniformComponentStyle
+          ? "Uniform styling is on. Change any swatch below to automatically unlock individual styling for this selected block."
+          : useCustom
+            ? "Individual styling is active. These swatches change only the selected block, not every card or button."
+            : "This block follows global Web Style values. Change any swatch below to make only this selected block custom."
+      }</p>
       <label class="field-toggle">
         <input type="checkbox" ${useCustom ? "checked" : ""} onchange="setComponentCustomStyle(this.checked)">
         Edit only this selected block
       </label>
-      ${useCustom ? `
+      ${showSwatches ? `
         <div class="style-grid">
           <div class="wide">
-            <label for="componentFont">Font</label>
-            <select id="componentFont" onchange="updateComponentStyle('font', this.value)">
+            <label for="${idPrefix}Font">Font</label>
+            <select id="${idPrefix}Font" onchange="updateComponentStyle('font', this.value)">
               ${fontOptions.map(([value, label]) => `<option value="${esc(value)}" ${styleValues.font === value ? "selected" : ""}>${esc(label)}</option>`).join("")}
             </select>
           </div>
           <div>
-            <label for="componentPanel">Card</label>
-            <input id="componentPanel" type="color" value="${esc(styleValues.panel)}" oninput="updateComponentStyle('panel', this.value)">
+            <label for="${idPrefix}Panel">Card</label>
+            <input id="${idPrefix}Panel" type="color" value="${esc(styleValues.panel)}" oninput="updateComponentStyle('panel', this.value)">
           </div>
           <div>
-            <label for="componentText">Text</label>
-            <input id="componentText" type="color" value="${esc(styleValues.text)}" oninput="updateComponentStyle('text', this.value)">
+            <label for="${idPrefix}Text">Text</label>
+            <input id="${idPrefix}Text" type="color" value="${esc(styleValues.text)}" oninput="updateComponentStyle('text', this.value)">
           </div>
           <div>
-            <label for="componentBorder">Border</label>
-            <input id="componentBorder" type="color" value="${esc(styleValues.border)}" oninput="updateComponentStyle('border', this.value)">
+            <label for="${idPrefix}Border">Border</label>
+            <input id="${idPrefix}Border" type="color" value="${esc(styleValues.border)}" oninput="updateComponentStyle('border', this.value)">
           </div>
           <div>
-            <label for="componentAccent">Button</label>
-            <input id="componentAccent" type="color" value="${esc(styleValues.accent)}" oninput="updateComponentStyle('accent', this.value)">
+            <label for="${idPrefix}Accent">Button</label>
+            <input id="${idPrefix}Accent" type="color" value="${esc(styleValues.accent)}" oninput="updateComponentStyle('accent', this.value)">
           </div>
           <div>
-            <label for="componentButtonText">Button text</label>
-            <input id="componentButtonText" type="color" value="${esc(styleValues.buttonText)}" oninput="updateComponentStyle('buttonText', this.value)">
+            <label for="${idPrefix}ButtonText">Button text</label>
+            <input id="${idPrefix}ButtonText" type="color" value="${esc(styleValues.buttonText)}" oninput="updateComponentStyle('buttonText', this.value)">
           </div>
         </div>` : `<p class="hint">This block currently follows the global Web Style values.</p>`}
     </div>`;
@@ -3284,6 +3458,90 @@ function renderInspector() {
     <div class="flow-actions">
       <button class="small" onclick="explainSelected()">Explain this component</button>
     </div>`;
+}
+
+function renderCanvasInspectorStatus() {
+  const selected = getSelected();
+  const badge = $("canvasSelectionBadge");
+  if (badge) badge.textContent = selected ? selected.name : "none";
+}
+
+function canvasPropControls(selected) {
+  return Object.entries(selected.props).map(([key, value]) => {
+    const val = typeof value === "object" ? JSON.stringify(value) : String(value);
+    const control = val.length > 48 || key === "text" || key === "keys"
+      ? `<textarea oninput="updateProp('${key}', this.value)">${esc(val)}</textarea>`
+      : `<input value="${esc(val)}" oninput="updateProp('${key}', this.value)">`;
+    return `<div><label>${esc(key)}</label>${control}</div>`;
+  }).join("");
+}
+
+function renderCanvasInspector() {
+  const box = $("canvasInspectorBody");
+  if (!box) return;
+  const selected = getSelected();
+  renderCanvasInspectorStatus();
+  const foundryLabel = state.foundryEnabled ? "KISS IQ on" : "Foundry off - local only - 0 tokens";
+  const foundryClass = state.foundryEnabled ? "badge gold" : "badge warn";
+  if (!selected) {
+    box.innerHTML = `
+      <div class="canvas-inspector-note">
+        Select any block on the build surface. This right editor will show its text, individual colors, and behavior without hiding what you are building.
+      </div>
+      <div class="quick-toolbar">
+        <button class="small primary" onclick="selectFirstComponent()">Select first block</button>
+        <button class="small" onclick="applyRecommendedTemplate()">Apply starter</button>
+        <button class="small" onclick="fitViewport()">Fit canvas</button>
+        <button class="small" onclick="togglePanel('terminal')">Open AI Chat</button>
+      </div>
+      <div class="summary">
+        <span class="${foundryClass}">${foundryLabel}</span><br>
+        Ask questions in AI Chat or turn on KISS IQ only when you want engine-backed guidance.
+      </div>`;
+    return;
+  }
+  const customActive = !state.uniformComponentStyle && selected.styles && selected.styles.useGlobal === false;
+  box.innerHTML = `
+    <div class="summary">
+      <b>${esc(selected.name)}</b><br>
+      Type: ${esc(selected.type)}<br>
+      ${customActive ? "Individual styling is active for this block." : "This block is currently following global styling."}
+    </div>
+    <div class="quick-toolbar">
+      <button class="small primary" onclick="setComponentCustomStyle(true)">Edit this block only</button>
+      <button class="small" onclick="setUniformComponentStyle(true)">Make uniform</button>
+      <button class="small" onclick="fitViewport()">Fit canvas</button>
+      <button class="small" onclick="focusSelected()">Focus selected</button>
+    </div>
+    <div class="prop-grid">
+      ${canvasPropControls(selected)}
+    </div>
+    ${renderSelectedStyleControls(selected, "canvasComponent")}
+    ${renderInteractionEditor(selected)}
+    <div class="interaction-editor">
+      <div class="editor-section-title">
+        <h3>Ask AI / Smart Terminal</h3>
+        <span class="${foundryClass}">${foundryLabel}</span>
+      </div>
+      <p class="hint">This asks the local Tutor Agent first. KISS IQ is used only when the top KISS IQ switch is on.</p>
+      <input id="canvasAssistantInput" placeholder="Ask: how do I change this card color?">
+      <div class="flow-actions">
+        <button class="small primary" onclick="askCanvasAssistant()">Ask</button>
+        <button class="small" onclick="setFoundry(!state.foundryEnabled)">${state.foundryEnabled ? "Turn KISS IQ off" : "Turn KISS IQ on"}</button>
+        <button class="small" onclick="togglePanel('terminal')">Show full chat</button>
+      </div>
+      <div class="hint" id="canvasAssistantAnswer">${esc(state.canvasAssistantLast || "No question yet.")}</div>
+    </div>`;
+}
+
+function askCanvasAssistant() {
+  const input = $("canvasAssistantInput");
+  const value = input?.value.trim();
+  if (!value) return;
+  const record = assistantAnswer(value);
+  state.canvasAssistantLast = record.resultText;
+  addTerminalRecord(record);
+  renderCanvasInspector();
 }
 
 function renderStyleControls() {
@@ -4251,7 +4509,7 @@ function assistantAnswer(input) {
     answer = "Click directly on text in the Build Space and start typing. You can also select a block and edit its fields in the Inspector. The Inspector now keeps focus while you type.";
     next = ["Select first block", "How do I change colors?", "Click shows message"];
   } else if (/(color|font|style|design|border|card|panel)/.test(text)) {
-    answer = "Use Web Style in the Inspector for global page colors and fonts. To style one card or button by itself, turn off Keep cards and buttons uniform, select the block, then use Selected Block Style.";
+    answer = "Use Web Style for global page colors and fonts. To style one card or button by itself, select it and use the Selected Block Style swatches in the Right Editor; changing a swatch automatically makes that block individual.";
     next = ["Apply starter", "How do I pick a font?", "Preview Only"];
   } else if (/(command|folder|directory|file|terminal|mkdir|touch)/.test(text)) {
     answer = "Use `mkdir project` to create a folder in the sandbox, `cd project` to move into it, and `touch index.html` to create a file. These are simulated and do not touch your real machine.";

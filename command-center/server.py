@@ -478,6 +478,11 @@ class H(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
+    def _redirect(self, location):
+        self.send_response(302)
+        self.send_header("Location", location)
+        self.end_headers()
+
     def do_GET(self):
         u = urllib.parse.urlparse(self.path)
         qs = urllib.parse.parse_qs(u.query)
@@ -492,7 +497,7 @@ class H(BaseHTTPRequestHandler):
         elif u.path == "/builder":
             self._file(HERE / "builder-studio-prototype.html", "text/html; charset=utf-8")
         elif u.path == "/builder-iq":
-            self._file(ROOT / "archive" / "builder-studio-iq-demo" / "index.html", "text/html; charset=utf-8")
+            self._redirect("/builder")
         elif u.path.startswith("/assets/"):
             f = (HERE / u.path.lstrip("/")).resolve()
             if f.is_file() and HERE in f.parents:

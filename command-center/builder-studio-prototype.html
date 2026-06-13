@@ -1767,6 +1767,7 @@
   </nav>
 
   <div class="toolbar-actions">
+    <button class="small" onclick="location.href='/'" title="Back to the KISS Command Center dashboard">&larr; Command Center</button>
     <label class="toggle" title="Show hidden advanced tools">
       <input id="expertToggle" type="checkbox" onchange="setExpert(this.checked)"> Expert
     </label>
@@ -2224,7 +2225,7 @@ const LOCAL_AGENTS = [
 ];
 
 const IQ_SOURCES = [
-  "Foundry IQ mock: grounded planner knowledge",
+  "KISS IQ: grounded planner knowledge",
   "OWASP-style validation guidance",
   "WCAG-style usability and accessibility guidance",
   "Internal project memory from prior builds"
@@ -3586,7 +3587,7 @@ function renderCanvasInspector() {
   if (!box) return;
   const selected = getSelected();
   renderCanvasInspectorStatus();
-  const foundryLabel = state.foundryEnabled ? "KISS IQ on" : "Foundry off - local only - 0 tokens";
+  const foundryLabel = state.foundryEnabled ? "KISS IQ on" : "KISS IQ off - local only - 0 tokens";
   const foundryClass = state.foundryEnabled ? "badge gold" : "badge warn";
   if (!selected) {
     box.innerHTML = `
@@ -3719,14 +3720,14 @@ function foundryInsight() {
     return {
       title: "Why one primary action",
       text: "A beginner build should make the next user action obvious. One clear button makes testing and explanation easier.",
-      sources: ["WCAG-style usability guidance", "Foundry IQ mock: UI pattern retrieval"]
+      sources: ["WCAG-style usability guidance", "KISS IQ: UI pattern retrieval"]
     };
   }
   if (state.terminal.history.length > 0) {
     return {
       title: "Smart terminal grounding",
       text: "Local sandbox commands stay safe, while Foundry IQ can explain real-world command usage and best practices.",
-      sources: ["Foundry IQ mock: developer docs retrieval", "Internal project memory from prior commands"]
+      sources: ["KISS IQ: developer docs retrieval", "Internal project memory from prior commands"]
     };
   }
   return {
@@ -4124,7 +4125,7 @@ function renderModeDetail() {
     const insight = foundryInsight();
     box.innerHTML = `<div class="capability-grid">
       <div class="iq-card">
-        <span class="badge ${state.foundryEnabled ? "gold" : "warn"}">${state.foundryEnabled ? "Foundry IQ mock" : "Foundry off"}</span>
+        <span class="badge ${state.foundryEnabled ? "gold" : "warn"}">${state.foundryEnabled ? "KISS IQ" : "KISS IQ off"}</span>
         <h3>${esc(insight.title)}</h3>
         <p>${esc(insight.text)}</p>
         <div class="source-list">
@@ -4157,7 +4158,7 @@ function renderModeDetail() {
           </div>
         </div>
         <div class="iq-card">
-          <span class="badge gold">Foundry IQ mock</span>
+          <span class="badge gold">KISS IQ</span>
           <h3>${esc(foundryInsight().title)}</h3>
           <p>${esc(foundryInsight().text)}</p>
         </div>
@@ -4254,7 +4255,7 @@ function runChecks(writeAudit = true) {
     },
     {
       pass: true,
-      label: "Foundry IQ mock is visible",
+      label: "KISS IQ is visible",
       detail: state.foundryEnabled ? "Mock grounding cards are on. Still no real account calls from this prototype." : "Foundry is off, so the prototype stays in local-only guidance mode."
     }
   ];

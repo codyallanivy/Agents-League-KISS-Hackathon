@@ -4,4 +4,4 @@
 
 - OFF LIMITS (player rule): no player-character death in act 1
 - Asset generation governed by ../templates/ASSET_POLICY.md
-- Tier 2/3 requests: capture in DECISIONS.md, don't 
+- Tier 2/3 requests: capture in DECISIONS.md, don't build

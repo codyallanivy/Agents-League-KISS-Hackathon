@@ -19,3 +19,4 @@
 
 ### Out of Scope for Now
 - Full illustrated rulebook
+- Voice-acted scenes

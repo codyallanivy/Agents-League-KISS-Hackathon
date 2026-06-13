@@ -12,10 +12,13 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 TRACES = HERE / "traces"
 
-BLOCKED_TERMS = ["gore", "nude", "real person", "celebrity", "swastika",
-                 "beholder", "mind flayer", "owlbear"]  # franchise IP examples
+BLOCKED_TERMS = ["gore", "nude", "real person", "celebrity", "swastika", "hate symbol"]
 VIDEO_TERMS = ["video", "animate", "animated", "animation", "music", "voice"]
-TIER1_TYPES = {"cover": 1, "portrait": 4, "map": 1, "title-card": 1}
+# Tier-1 quotas per asset kind. Neutral, domain-agnostic kinds are first; the
+# trailing legacy kinds keep the optional fantasy template governed correctly.
+TIER1_TYPES = {"cover": 1, "logo": 1, "palette": 1, "banner": 2, "mockup": 2,
+               "diagram": 1, "card": 2,
+               "portrait": 4, "map": 1, "title-card": 2}
 SESSION_CAP_IMAGES = 12
 SESSION_CAP_USD = 2.00
 VERIFICATION_CAP = 8

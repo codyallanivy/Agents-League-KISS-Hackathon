@@ -21,7 +21,7 @@ Every asset request is checked BEFORE generation: **ACCEPT** (in policy + budget
 ## Content & rights rules
 
 - No real-person likenesses; no living-artist style mimicry by name
-- Original fantasy content only; no franchise IP (no D&D-trademarked monsters, use generics)
+- Original content only; no franchise/trademarked IP (no trademarked characters or creatures — use generics)
 - Age-appropriate (PG-13); no gore, no hate symbols
 - AI video: policy applies when feature is unparked (see DECISIONS.md D-H03)
 

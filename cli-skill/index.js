@@ -19,7 +19,7 @@ if (command === "init") {
   fs.writeFileSync(path.join(projectPath, "PROJECT_STATE.md"), "# Project State\n\n");
   fs.writeFileSync(path.join(projectPath, "TODO.md"), "# TODO\n\n");
   fs.writeFileSync(path.join(projectPath, "DECISIONS.md"), "# Decisions\n\n");
-  fs.writeFileSync(path.join(projectPath, "RISK.md"), "# Risks\n\n");
+  fs.writeFileSync(path.join(projectPath, "RISK_POLICY.md"), "# Risk Policy\n\n");
   fs.writeFileSync(path.join(projectPath, "PRODUCT_VISION.md"), "# Product Vision\n\n");
 
   console.log(`✅ KISS project "${arg}" initialized`);

@@ -1,0 +1,6 @@
+# Pending Verification — Generated Assets
+
+> Source of truth for: assets generated but not yet human-reviewed.
+
+- [ ] 2026-06-13 | cover | cover-1.svg | unreviewed
+- [ ] 2026-06-13 | cover | cover-1.svg | unreviewed

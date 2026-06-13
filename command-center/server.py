@@ -32,12 +32,19 @@ from iq.work_iq import WorkIQ                                         # noqa: E4
 T2 = ROOT / "foundry-track2"
 
 
+def is_fantasy(d: Path) -> bool:
+    """A dir flagged as isolated fantasy-template output. These are never
+    discovered or indexed, so the optional fantasy template cannot influence
+    any other project's planning or grounded output."""
+    return (d / ".fantasy").exists()
+
+
 def discover_projects():
     found = {}
     for base in [ROOT / "demo-project", ROOT / "creative-track1" / "output"]:
         if base.exists():
             for d in sorted(base.iterdir()):
-                if d.is_dir() and (d / "PROJECT_STATE.md").exists():
+                if d.is_dir() and (d / "PROJECT_STATE.md").exists() and not is_fantasy(d):
                     found[d.name] = d
     return found
 
@@ -93,6 +100,13 @@ def proj():
 
 def read(p):
     return p.read_text(encoding="utf-8", errors="replace") if p.exists() else ""
+
+
+def creation_doc(d=None):
+    """The project's primary creation document. New projects use CREATION.md;
+    older demo projects may still use CAMPAIGN.md (read-compatible)."""
+    d = d or proj()
+    return (d / "CREATION.md") if (d / "CREATION.md").exists() else (d / "CAMPAIGN.md")
 
 
 def vision_text():
@@ -270,14 +284,57 @@ def traces(q=""):
     return steps[-30:][::-1]
 
 
-def chat(message, file_context=""):
-    grounding = CTX.foundry_iq.retrieve(message)
+def retrieve_for_mode(query, mode="project", top_k=4):
+    """Project-aware retrieval: keep one project's memory from contaminating
+    another project's reasoning. Always allows the ACTIVE project's own files
+    plus shared KISS method knowledge; other projects never bleed in. (Citations
+    from FoundryIQ are prefixed with the project folder, so the ACTIVE + "/" gate
+    is exact.) This is what stops, e.g., creative content surfacing inside an
+    unrelated project's planning answers."""
+    results = CTX.foundry_iq.retrieve(query, top_k=25)
+    if mode == "global":
+        return results[:top_k]
+    core = ["kiss_certification_guide.md", "context_health_policy.md"]
+    allowed = [ACTIVE + "/"] + core
+    filtered = [g for g in results if any(a in g.get("citation", "") for a in allowed)]
+    # No global fallback: if nothing in the ACTIVE project (or shared method docs)
+    # matches, return nothing rather than leaking another project's memory into
+    # the answer. This is what kept unrelated questions reaching for other projects.
+    return filtered[:top_k]
+
+
+def chat(message, file_context="", mode="project"):
+    grounding = retrieve_for_mode(message, mode)
     if file_context:
         # project-only grounding: drop chunks from other projects/domains so
         # e.g. a coffee brand never inherits fantasy-campaign flavor
         own = [g for g in grounding if g["citation"].startswith(ACTIVE + "/")]
         grounding = [{"citation": f"{ACTIVE} project files (live)",
                       "snippet": file_context[:1200]}] + own[:3]
+    if mode == "assistant":
+        # A real general assistant: answer ANY question from the model's own
+        # knowledge. Project notes are optional context, attached only when they
+        # actually match the active project — never forced into unrelated answers,
+        # and never another project's content.
+        system = ("You are a helpful, knowledgeable general assistant. Answer the "
+                  "user's question directly and accurately from your own knowledge. "
+                  "Optional project notes may appear below; use them ONLY if the "
+                  "question is clearly about the user's active project, otherwise "
+                  "ignore them entirely and just answer normally. Never pad an "
+                  "unrelated answer with project references. Be concise and warm.")
+        notes = ("\n\n".join(f"[{g['citation']}]\n{g['snippet']}" for g in grounding)
+                 or "(no project notes apply — answer from general knowledge)")
+        raw = CTX.model.complete(system, f"QUESTION: {message}\n\nOPTIONAL PROJECT NOTES:\n{notes}")
+        if raw is None:
+            raw = ("(offline tier) General questions need a model tier — switch on "
+                   "Foundry or Ollama in the top bar. I can still answer questions "
+                   "about your active project offline.")
+        CTX.tracer.log(agent="Assistant", model=CTX.model.mode,
+                       prompt={"system": "assistant", "user": message},
+                       grounding=[g["citation"] for g in grounding],
+                       output={"answer": raw}, extra={"project": ACTIVE})
+        # only surface citations when project notes were actually relevant/used
+        return {"answer": raw, "cites": [g["citation"] for g in grounding][:3]}
     system = ("You are the KISS Agile coach. Answer from the cited project knowledge; "
               "protect scope; be concise and warm. Cite sources in [brackets].")
     cites = "\n\n".join(f"[{g['citation']}]\n{g['snippet']}" for g in grounding) or "(none)"
@@ -419,12 +476,15 @@ def art_direction(project_dir=None):
     text = " ".join(read(d / f) for f in
                     ("PROJECT_STATE.md", "PRODUCT_VISION.md", "BRAND_VOICE.md",
                      "agile/PRODUCT_VISION.md")).lower()
-    if any(w in text for w in ("grim", "dark", "noir", "horror", "somber")):
-        tone = "grim"
-    elif any(w in text for w in ("whimsical", "playful", "fun", "cozy", "cute")):
-        tone = "whimsical"
+    # Neutral, domain-agnostic tone -> palette mapping (see intake_studio.PALETTES).
+    if any(w in text for w in ("grim", "dark", "noir", "premium", "luxury", "bold", "serious")):
+        tone = "bold"
+    elif any(w in text for w in ("warm", "cozy", "friendly", "playful", "fun", "homey")):
+        tone = "warm"
+    elif any(w in text for w in ("calm", "minimal", "clinical", "modern", "tech")):
+        tone = "calm"
     else:
-        tone = "heroic"
+        tone = "clean"
     goal = (re.search(r"(?:sprint goal|goal|vision)[:*\s]+(.+)", read(d / "PROJECT_STATE.md"),
                       re.I) or [None, d.name])[1].strip()[:90]
     voice = read(d / "BRAND_VOICE.md")[:200].replace("\n", " ")
@@ -629,7 +689,7 @@ class H(BaseHTTPRequestHandler):
                         "answer": r.get("answer"), "critic": r["critic"]["verdict"],
                         "project": ACTIVE})
         elif self.path == "/api/chat":
-            self._json(chat(data.get("message", "")))
+            self._json(chat(data.get("message", ""), mode=data.get("mode", "project")))
         elif self.path == "/api/memo":
             self._json({"memos": memos(add=data.get("text", "").strip() or None)})
         elif self.path == "/api/todo":
@@ -651,26 +711,25 @@ class H(BaseHTTPRequestHandler):
                 globals()["ACTIVE"] = d.name
                 self._json({"active": d.name, "created": created, "projects": list(PROJECTS)})
         elif self.path == "/api/add-asset":
-            kind = data.get("kind", "cover")
+            kind = data.get("kind", "cover").strip().lower()
             prompt_txt = data.get("prompt", "").strip() or kind
             from asset_governor import AssetGovernor as _AG
-            import campaign_studio as cs
+            import intake_studio as ist
+            kind = kind if kind in ist.ASSET_KINDS else "cover"
             gov = _AG(proj())
-            d = gov.check(kind if kind in ("cover", "portrait", "map", "title-card") else "cover",
-                          prompt_txt)
+            d = gov.check(kind, prompt_txt)
             if d["verdict"] == "BLOCK":
                 gov.park(kind, prompt_txt, d["reasons"])
                 self._json({"error": "Governor: BLOCK — " + "; ".join(d["reasons"])}, 400)
             else:
                 ad = art_direction()
-                pal = cs.PALETTES.get(ad["tone"], cs.PALETTES["heroic"])
+                pal = ist.palette_for(ad["tone"])
                 (proj() / "assets").mkdir(exist_ok=True)
                 n = 1
                 while (proj() / "assets" / f"{kind}-{n}.svg").exists():
                     n += 1
                 p = proj() / "assets" / f"{kind}-{n}.svg"
-                cs.svg_asset(kind, prompt_txt[:36], pal, p, seed=ACTIVE + prompt_txt,
-                             fantasy=False)
+                ist.svg_asset(kind, prompt_txt[:36], pal, p, seed=ACTIVE + prompt_txt)
                 gov.record_generation(kind, p.name, d["estimated_cost_usd"])
                 self._json({"ok": True, "file": p.name, "verdict": d["verdict"],
                             "note": d["reasons"][0] if d["reasons"] else ""})
@@ -717,7 +776,7 @@ class H(BaseHTTPRequestHandler):
         elif self.path == "/api/creative-chat":
             msg = data.get("message", "").strip()
             low = msg.lower()
-            doc = proj() / "CAMPAIGN.md"
+            doc = creation_doc()
             if any(low.startswith(w) for w in ("survey me", "new project", "build me", "i want to build", "i want to create", "create a new")):
                 self.path = "/api/survey-questions"  # fallthrough not possible; call logic inline below
                 data["idea"] = msg
@@ -740,16 +799,17 @@ class H(BaseHTTPRequestHandler):
                     f"EXISTING ASSETS: {assets_list}\n\nINSTRUCTION: {msg}\n\n"
                     f"DOCUMENT:\n{read(doc)[:9000]}")
                 if raw and len(raw.strip()) > 100:
-                    (proj() / "CAMPAIGN_prev.md").write_text(read(doc), encoding="utf-8")
+                    prev = doc.parent / (doc.stem + "_prev.md")
+                    prev.write_text(read(doc), encoding="utf-8")
                     doc.write_text(raw.strip(), encoding="utf-8")
                     with open(proj() / "ITERATION_LOG.md", "a", encoding="utf-8") as fh:
                         fh.write(f"\n## {time.strftime('%Y-%m-%d %H:%M')} — creative chat edit\n"
-                                 f"Instruction: {msg[:140]} (previous saved to CAMPAIGN_prev.md)\n")
+                                 f"Instruction: {msg[:140]} (previous saved to {prev.name})\n")
                     CTX.tracer.log(agent="CreativeChat", model=CTX.model.mode,
                                    prompt={"system": "doc-edit", "user": msg},
                                    output={"answer": "document updated"}, extra={"project": ACTIVE})
                     self._json({"type": "edited",
-                                "answer": "✓ Document updated (previous version kept as CAMPAIGN_prev.md, logged to ITERATION_LOG). "
+                                "answer": f"✓ Document updated (previous version kept as {prev.name}, logged to ITERATION_LOG). "
                                           + raw.strip()[:300] + "…"})
                 else:
                     self._json({"type": "chat", "answer": "The edit didn't produce a usable document — try rewording.", "cites": []})
@@ -764,103 +824,98 @@ class H(BaseHTTPRequestHandler):
         elif self.path == "/api/survey-questions":
             return self._survey_questions(data)
         elif self.path == "/api/campaign":
-            import random as _rnd
-            sys.path.insert(0, str(ROOT / "creative-track1"))
-            import campaign_studio as cs
+            # Domain-neutral project intake: any idea -> governed KISS project +
+            # creation document + a small asset kit GROUNDED in project references.
+            import intake_studio as ist
             idea = data.get("idea", "").strip()
             qa = data.get("qa", [])
-            if idea:  # adaptive intake: derive the standard fields from idea + answers
-                answers = [str(x.get("a", "")).strip() for x in qa] + [""] * 5
-                alltext = (idea + " " + " ".join(answers)).lower()
-                tone = ("grim" if any(w in alltext for w in ("grim", "dark", "noir", "serious", "horror"))
-                        else "whimsical" if any(w in alltext for w in ("whimsical", "playful", "fun", "cozy", "cute"))
-                        else "heroic")
-                a = {"title_seed": (answers[0] or " ".join(idea.split()[:3])).lower(),
-                     "tone": tone, "setting": "coastal", "party_level": "3", "sessions": "3",
-                     "must_have": answers[2] or idea[:60],
-                     "off_limits": answers[3] or "nothing specified yet"}
-            else:
-                a = {k: str(data.get(k, dflt)).strip() or dflt for k, _q, dflt in cs.SURVEY}
+            answers = [str(x.get("a", "")).strip() for x in qa] + [""] * 5
+            if not idea:  # raw survey post: synthesize an idea from the answers
+                idea = " ".join(a for a in answers if a) or answers[0]
+            tone = ist.detect_tone(idea + " " + " ".join(answers))
+            a = {"title_seed": (answers[0] or " ".join(idea.split()[:3]) or "new project").lower(),
+                 "tone": tone,
+                 "audience": answers[4] or "the intended audience",
+                 "must_have": answers[2] or idea[:60],
+                 "off_limits": answers[3] or "nothing specified yet"}
             out = ROOT / "creative-track1" / "output" / a["title_seed"].replace(" ", "-")
-            title = cs.scaffold_project(a, out)
-            rng = _rnd.Random(a["title_seed"])
-            npcs = list(zip(rng.sample(cs.NAMES, 4), rng.sample(cs.ROLES, 4),
-                            rng.sample(cs.MOTIVES, 4)))
+            title = ist.scaffold_project(a, out)
+
+            # --- REFERENCE GROUNDING (search before generating) -----------------
+            # 1) the project's own intake signal; 2) related approved knowledge.
+            qa_lines = "\n".join(f"Q: {x.get('q','')}\nA: {x.get('a','')}" for x in qa if x.get("a"))
+            kb_hits = CTX.foundry_iq.retrieve(idea, top_k=3)
+            kb_refs = "\n".join(f"[{h['citation']}] {h['snippet'][:200]}" for h in kb_hits)
+            references = (f"INTAKE ANSWERS:\n{qa_lines or '- (none)'}\n\n"
+                          f"MUST-HAVE (Tier 1): {a['must_have']}\n"
+                          f"AUDIENCE: {a['audience']}\nTONE: {a['tone']}\n\n"
+                          f"RELATED KISS KNOWLEDGE (for structure/method, not content):\n{kb_refs or '- (none)'}")
+            CTX.tracer.log(agent="IntakeGrounding", model=CTX.model.mode,
+                           prompt={"system": "reference-search", "user": idea},
+                           grounding=[h["citation"] for h in kb_hits],
+                           output={"answer": f"grounded asset+doc generation in {len(kb_hits)} reference(s)"},
+                           extra={"project": a["title_seed"]})
+
+            # --- creation document, grounded in references ----------------------
             prose = None
             if CTX.model.mode != "offline":
-                if idea:  # generic creation document, grounded in idea + Q/A
-                    qa_lines = "\n".join(f"Q: {x.get('q','')}\nA: {x.get('a','')}" for x in qa)
-                    prose = CTX.model.complete(
-                        "You are a creative director and planner. Produce the primary "
-                        "creation document for this project (whatever fits: campaign, "
-                        "brand kit, product concept, lesson plan, event plan...). "
-                        "Write in THIS project's own domain and vocabulary — no fantasy/RPG "
-                        "tropes or mythic flavor unless the idea is itself a game/campaign. "
-                        "Original content only, PG-13. Clean Markdown, 600-1000 words, "
-                        "ending with '## Next Steps' (3 bullets).",
-                        f"IDEA: {idea}\n\nINTAKE ANSWERS:\n{qa_lines}")
-                else:
-                    prose = cs.llm_campaign(CTX.model, a, title, npcs)
+                prose = ist.llm_creation(CTX.model, idea, a, title, references=references)
             if not prose:
-                if idea:  # generic offline template
-                    qa_md = "\n".join(f"- **{x.get('q','?')}** {x.get('a','')}" for x in qa if x.get("a"))
-                    prose = (f"# {title}\n\n> Generated offline — connect Ollama or Foundry for a full draft.\n\n"
-                             f"## The Idea\n\n{idea}\n\n## Intake\n\n{qa_md or '- (no answers given)'}\n\n"
-                             f"## Three-Phase Plan\n\n1. **Shape it** — turn the must-have into one testable Tier 1 outcome.\n"
-                             f"2. **Build the smallest version** — only what Tier 1 needs; park everything else in DECISIONS.md.\n"
-                             f"3. **Verify with a real person** — before adding anything new.\n\n"
-                             f"## Next Steps\n\n- Fill PRODUCT_VISION.md tiers\n- Set the sprint goal in PROJECT_STATE.md\n- Generate the vision board")
-                else:
-                    prose = cs.template_campaign(a, title, npcs, rng)
-            (out / "CAMPAIGN.md").write_text(prose, encoding="utf-8")
+                # offline doc cites reference SOURCES (labels) — never pastes other
+                # content's body, so nothing from another project can bleed in.
+                kb_cites = "; ".join(h["citation"] for h in kb_hits)
+                prose = ist.template_creation(a, title, idea=idea, references=kb_cites)
+            (out / "CREATION.md").write_text(prose, encoding="utf-8")
+
+            # --- asset kit: plan from what THIS project needs, grounded ---------
             from asset_governor import AssetGovernor as _AG
             gov = _AG(out)
-            pal = cs.PALETTES.get(a["tone"], cs.PALETTES["heroic"])
+            pal = ist.palette_for(a["tone"])
             (out / "assets").mkdir(exist_ok=True)
+            doc_heads = ", ".join(re.findall(r"^#{2,3} (.+)$", prose, re.M)[:6])
+            asset_refs = (f"IDEA: {idea[:160]}\nMUST-HAVE: {a['must_have']}\n"
+                          f"AUDIENCE: {a['audience']}\nDOCUMENT SECTIONS: {doc_heads or 'n/a'}")
+            reqs = None
+            if CTX.model.mode != "offline":
+                rawp = CTX.model.complete(
+                    "You plan a small visual asset kit for a project. Using the project "
+                    "references, return EXACTLY a JSON array of 4-5 assets THIS project "
+                    "actually needs. Each item: "
+                    '{"type": one of "cover"|"logo"|"palette"|"banner"|"mockup"|"diagram"|"card", '
+                    '"label": short specific label}. Choose types that fit the domain '
+                    "(brand -> logo, palette, banner; app -> mockup, logo; course/event -> "
+                    "cover, card, diagram). JSON only.",
+                    "PROJECT REFERENCES:\n" + asset_refs)
+                try:
+                    s = rawp[rawp.index("["):rawp.rindex("]") + 1]
+                    plan = [p for p in json.loads(s)
+                            if isinstance(p, dict) and p.get("type") in ist.ASSET_KINDS][:5]
+                    if plan:
+                        reqs = [(p["type"], str(p.get("label", title))[:40]) for p in plan]
+                except Exception:
+                    reqs = None
+            if not reqs:  # grounded deterministic kit
+                reqs = ist.default_asset_kit(title, a["must_have"])
+
             log = []
-            if idea:  # generic asset set — no campaign tropes
-                reqs = None
-                if CTX.model.mode != "offline":
-                    rawp = CTX.model.complete(
-                        "You plan visual asset kits. Given a project idea, return EXACTLY a "
-                        "JSON array of 4-5 assets this KIND of project actually needs "
-                        "(brand → logo concept, palette card, social banner; app → icon, "
-                        "screen mockup; course → cover, lesson card; game → cover, map...). "
-                        'Each item: {"type": one of "cover"|"portrait"|"map"|"title-card", '
-                        '"label": short specific label}. JSON only.',
-                        "IDEA: " + idea[:300])
-                    try:
-                        s = rawp[rawp.index("["):rawp.rindex("]") + 1]
-                        plan = [p for p in json.loads(s)
-                                if isinstance(p, dict) and p.get("type") in
-                                ("cover", "portrait", "map", "title-card")][:5]
-                        if plan:
-                            reqs = [(p["type"], str(p.get("label", title))[:40]) for p in plan]
-                    except Exception:
-                        reqs = None
-                if not reqs:
-                    reqs = [("cover", title),
-                            ("map", "Project overview — " + title),
-                            ("title-card", title),
-                            ("title-card", a["must_have"][:36])]
-            else:
-                reqs = ([("cover", title)] + [("portrait", f"{n} the {r}") for n, r, _m in npcs]
-                        + [("map", "Region map"), ("title-card", f"Session One — {title}")])
             for kind, prompt in reqs:
                 d = gov.check(kind, prompt)
                 log.append(f"{d['verdict']} {kind}: {prompt[:40]}")
                 if d["verdict"] == "ACCEPT":
                     p = out / "assets" / f"{kind}-{gov.counts.get(kind, 0) + 1}.svg"
-                    cs.svg_asset(kind, prompt[:36], pal, p, seed=a["title_seed"],
-                                 fantasy=not bool(idea))
+                    ist.svg_asset(kind, prompt[:36], pal, p, seed=a["title_seed"])
                     gov.record_generation(kind, p.name, d["estimated_cost_usd"])
+                elif d["verdict"] == "BLOCK":
+                    gov.park(kind, prompt, d["reasons"])
+
             PROJECTS = discover_projects()
             PROJECTS.update(load_registry())
             ACTIVE = out.name
             for f in sorted(out.rglob("*.md")):
                 CTX.foundry_iq._index_file(f)
             self._json({"active": ACTIVE, "title": title, "words": len(prose.split()),
-                        "governance": log, "projects": list(PROJECTS)})
+                        "governance": log, "references_used": [h["citation"] for h in kb_hits],
+                        "projects": list(PROJECTS)})
         elif self.path == "/api/edit-asset":
             rel, instruction = data.get("path", ""), data.get("instruction", "")
             f = (proj() / rel).resolve()

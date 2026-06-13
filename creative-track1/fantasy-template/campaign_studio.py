@@ -1,9 +1,13 @@
 #!/usr/bin/env python3
-"""KISS Campaign Studio — Track 1: Creative Apps.
+"""Fantasy Campaign template — an OPTIONAL, self-contained example project.
 
-Survey (= KISS intake) → governed campaign project → original fantasy campaign
-→ art assets, every one passing the Asset Governor (ACCEPT/WARN/BLOCK +
-cost-before-spend).
+This is a *side template* that shows the KISS system is general enough to even
+author a tabletop-RPG campaign. It is deliberately ISOLATED: it writes only into
+this `fantasy-template/` folder, it is NOT discovered as a project by the Command
+Center, and its output is NEVER indexed into the shared knowledge base. Nothing
+here influences how any other project is planned, surveyed, or generated.
+
+Launch it only on purpose: `start.bat` -> option 3, or run this file directly.
 
 Content quality ladder (research: "Community Open Model Path"):
   1. Microsoft Foundry (AZURE_AI_PROJECT_ENDPOINT set)  — cloud model
@@ -21,8 +25,11 @@ import sys
 import time
 from pathlib import Path
 
-HERE = Path(__file__).resolve().parent
-sys.path.insert(0, str(HERE.parent / "foundry-track2"))
+HERE = Path(__file__).resolve().parent          # creative-track1/fantasy-template
+CT1 = HERE.parent                                # creative-track1 (asset_governor lives here)
+ROOT = CT1.parent                                # repo root
+sys.path.insert(0, str(ROOT / "foundry-track2"))
+sys.path.insert(0, str(CT1))
 
 from asset_governor import AssetGovernor
 from agents.base_agent import ModelClient  # reuse the 3-tier model ladder
@@ -68,6 +75,10 @@ def survey(preset):
 
 def scaffold_project(a, out):
     out.mkdir(parents=True, exist_ok=True)
+    # Hard isolation marker: any project scanner / knowledge indexer skips dirs
+    # containing this file, so a fantasy campaign can never leak into another
+    # project's planning or grounded output.
+    (out / ".fantasy").write_text("isolated fantasy template output — do not index\n", encoding="utf-8")
     title = a["title_seed"].title()
     (out / "PROJECT_STATE.md").write_text(
         f"# Project State — Campaign '{title}'\n\n"

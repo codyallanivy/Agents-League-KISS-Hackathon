@@ -22,7 +22,7 @@ echo  ============================================
 echo.
 echo    [1] Command Center dashboard  (recommended)
 echo    [2] Track 2 reasoning demo    (terminal)
-echo    [3] Campaign Studio           (D&D demo)
+echo    [3] Fantasy Campaign template (optional - isolated example)
 echo    [4] Vision board for creator-launch
 echo    [5] Teams governance mock     (browser)
 echo    [6] Builder Studio            (advanced + KISS IQ)
@@ -42,10 +42,11 @@ if "%choice%"=="1" (
     echo.
     pause
 ) else if "%choice%"=="3" (
-    cd creative-track1
+    cd creative-track1\fantasy-template
     python campaign_studio.py --preset
     echo.
-    echo  Output: creative-track1\output\ember-tides\
+    echo  Output: creative-track1\fantasy-template\output\ember-tides\
+    echo  (Optional side template - fully isolated; affects no other project.)
     pause
 ) else if "%choice%"=="4" (
     cd creative-track1

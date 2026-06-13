@@ -67,6 +67,12 @@
   .mode:hover { border-color:var(--gold); }
   .mode b { color:var(--gold); display:block; margin-bottom:5px; font-size:13px; }
   .mode span { color:var(--dim); font-size:11.5px; line-height:1.5; }
+  .vp { color:var(--ink); font-size:13px; max-width:640px; margin:0 auto 10px; line-height:1.55; border-left:3px solid var(--gold); padding-left:12px; text-align:left; }
+  .demoflow { margin:22px auto 0; max-width:680px; background:var(--panel); border:1px solid var(--edge); border-radius:12px; padding:14px 16px; text-align:left; }
+  .demoflow b { color:var(--gold); font-size:12px; letter-spacing:1.5px; display:block; margin-bottom:6px; }
+  .demoflow span { color:var(--dim); font-size:11.5px; line-height:1.7; }
+  .demoflow code { color:var(--acc); }
+  .demoflow button { margin-top:12px; }
   /* View 3 */
   .gallery { display:grid; grid-template-columns:repeat(auto-fill, minmax(190px, 1fr)); gap:12px; }
   .gallery img { width:100%; border-radius:8px; border:1px solid var(--edge); background:#0e1726; }
@@ -86,6 +92,7 @@
 <div class="tabs">
   <div class="tab on" data-v="v1" onclick="tab('v1')">⌂ ASSISTANT</div>
   <div class="tab" data-v="v2" onclick="tab('v2')">▦ PROJECT OPS</div>
+  <div class="tab" onclick="location.href='/builder'" title="Open Builder Studio — the visual builder (Plan → Build → Code → Test → Export)">🧱 BUILDER STUDIO</div>
   <div class="tab" data-v="v3" onclick="tab('v3')">✦ CREATIVE STUDIO</div>
 </div>
 
@@ -93,12 +100,19 @@
   <div class="hero">
     <img src="/assets/bottle-logo.png" alt="">
     <h2>What are we building today?</h2>
-    <p>Local-first. Your files never leave this machine. The brain behind every answer is your own project memory.</p>
+    <p class="vp">KISS Studio helps AI-assisted teams build faster without losing scope, context, verification, or manager oversight.</p>
+    <p>Ask me anything — general questions are answered directly; questions about your active project are grounded in your own memory. Type <b>“survey me: …”</b> to turn an idea into a governed project right here. Local-first: your files never leave this machine.</p>
     <div id="herolog"></div>
-    <div class="row"><input id="heroin" placeholder="ask anything — or describe an idea…"><button onclick="heroSend()">Send</button><button onclick="compareModels()" title="Run this prompt through every model tier side by side">⚖ Compare</button></div>
+    <div class="row"><input id="heroin" placeholder='ask anything — or "survey me: a coffee shop brand"'><button onclick="heroSend()">Send</button><button onclick="compareModels()" title="Run this prompt through every model tier side by side">⚖ Compare</button></div>
     <div class="modes">
       <div class="mode" onclick="tab('v2')"><b>📋 Project planning mode</b><span>Run a real project with KISS discipline — board, scope gate, ROI, health, decisions.</span></div>
-      <div class="mode" onclick="tab('v3')"><b>✨ Creative mode</b><span>Generate a campaign or assets for fun — same governance, more art.</span></div>
+      <div class="mode" onclick="location.href='/builder'"><b>🧱 Builder Studio</b><span>The visual builder — Plan → Build → Code → Test → Export, with KISS IQ scope &amp; citation controls.</span></div>
+      <div class="mode" onclick="tab('v3')"><b>✦ Creative Studio</b><span>Turn any idea into a governed project: survey intake → creation doc → governed asset kit.</span></div>
+    </div>
+    <div class="demoflow">
+      <b>▶ Demo flow</b>
+      <span>1. Builder Studio — plan or describe an idea&nbsp; 2. Run Scope Gate&nbsp; 3. Check Board / Health / Traces&nbsp; 4. Generate Vision Board&nbsp; 5. Show M365 Governance view&nbsp; 6. Run evals (<code>cd foundry-track2 &amp;&amp; python evals.py</code>)</span>
+      <button onclick="loadJudgeDemo()" title="Prefill the demo inputs so you don't have to type during recording">▶ Load Judge Demo</button>
     </div>
   </div>
 </div>
@@ -216,6 +230,13 @@ function tab(v){
   document.querySelectorAll(".view").forEach(x=>x.classList.toggle("on", x.id===v));
   if(v==="v3"){ loadGallery(); loadVision(); $("ccproj").textContent = ACTIVE; }
 }
+function loadJudgeDemo(){
+  if($("scopein")) $("scopein").value = "Add blockchain payment integration";
+  if($("ccin")) $("ccin").value = "survey me: a local coffee shop brand that needs a logo, tagline, and a one-page site";
+  if($("heroin")) $("heroin").value = "Summarize this project's scope, blockers, and next best work";
+  tab('v2');
+  if($("statusline")) $("statusline").textContent = "Judge demo loaded — Scope Gate (BLOCK example) and Creative intake prefilled";
+}
 async function safe(fn){ try{ await fn(); }catch(e){ console.warn(fn.name, e); } }
 async function status(){
   const s = await (await fetch("/api/status")).json();
@@ -277,17 +298,53 @@ async function pickFolder(){
 }
 function refresh(){ [status, loadBoard, loadRoi, loadHealth, loadPop, loadNext, loadMemos, loadLog, loadTraces, loadVision, loadGallery].forEach(f=>safe(f)); }
 
-async function ask(input, logdiv){
+async function ask(input, logdiv, mode){
   const v = $(input).value.trim(); if(!v) return; $(input).value="";
   $(logdiv).insertAdjacentHTML("beforeend", `<div class="msg me">${esc(v)}</div>`);
   $(logdiv).insertAdjacentHTML("beforeend", `<div class="msg ai hint">thinking…</div>`);
   $(logdiv).scrollTop = 1e9;
-  const r = await (await fetch("/api/chat",{method:"POST",body:JSON.stringify({message:v})})).json();
+  const r = await (await fetch("/api/chat",{method:"POST",body:JSON.stringify({message:v, mode})})).json();
   $(logdiv).lastElementChild.outerHTML = `<div class="msg ai">${esc(r.answer)}<div class="cite">${esc((r.cites||[]).join(" · "))}</div></div>`;
   $(logdiv).scrollTop = 1e9; loadTraces();
 }
-const send = () => ask("chatin","chatlog");
-const heroSend = () => ask("heroin","herolog");
+const send = () => ask("chatin","chatlog","project");
+// Assistant tab: general assistant by default; "survey me: …" runs intake here too.
+function heroSend(){
+  const v = $("heroin").value.trim(); if(!v) return;
+  if(isIntake(v)){ heroSurvey(v); return; }
+  ask("heroin","herolog","assistant");
+}
+function isIntake(v){
+  return /^\s*(survey me|build me|make me|i want to (build|create)|create a |plan (a|an|my)|new project)/i.test(v);
+}
+let HSQS=[], HIDEA="";
+async function heroSurvey(idea){
+  $("heroin").value="";
+  $("herolog").insertAdjacentHTML("beforeend", `<div class="msg me">${esc(idea)}</div>`);
+  $("herolog").insertAdjacentHTML("beforeend", `<div class="msg ai hint">setting up a quick intake survey…</div>`);
+  $("herolog").scrollTop = 1e9;
+  try{
+    const r = await (await fetch("/api/survey-questions",{method:"POST",body:JSON.stringify({idea})})).json();
+    $("herolog").lastElementChild.remove();
+    HIDEA = idea.replace(/^\s*survey me[:,]?\s*/i,""); HSQS = r.questions || [];
+    const q = HSQS.map((x,i)=>`<div class="pop-q">${esc(x.q)}</div><input id="hsq${i}" placeholder="${esc(x.placeholder||"")}" style="width:100%;margin-bottom:6px">`).join("");
+    $("herolog").insertAdjacentHTML("beforeend", `<div class="msg ai">A few quick questions so your project fits your idea:<div style="margin-top:8px">${q}</div><button onclick="heroGenerate()" style="margin-top:4px">⚒ Generate governed project</button><div class="cite">${r.model==="offline"?"offline tier — generic intake; turn on a model for tailored questions":"tailored by "+esc(r.model)}</div></div>`);
+    $("herolog").scrollTop = 1e9;
+  }catch(e){ $("herolog").lastElementChild.outerHTML = `<div class="msg ai">intake failed: ${esc(e)}</div>`; }
+}
+async function heroGenerate(){
+  const body = { idea: HIDEA, qa: HSQS.map((x,i)=>({q:x.q, a:($("hsq"+i)?$("hsq"+i).value.trim():"")})) };
+  $("herolog").insertAdjacentHTML("beforeend", `<div class="msg ai hint">⚒ generating governed project + assets… (a few seconds offline)</div>`);
+  $("herolog").scrollTop = 1e9;
+  try{
+    const r = await (await fetch("/api/campaign",{method:"POST",body:JSON.stringify(body)})).json();
+    $("herolog").lastElementChild.remove();
+    if(r.error){ $("herolog").insertAdjacentHTML("beforeend", `<div class="msg ai">failed: ${esc(r.error)}</div>`); return; }
+    ACTIVE = r.active;
+    $("herolog").insertAdjacentHTML("beforeend", `<div class="msg ai">✓ '${esc(r.title)}' created and now active — ${r.words} words, ${r.governance.length} governed asset checks. Open <b style="cursor:pointer;color:var(--gold)" onclick="tab('v2')">Project Ops</b> or <b style="cursor:pointer;color:var(--gold)" onclick="tab('v3')">Creative Studio</b> to see it.</div>`);
+    $("herolog").scrollTop = 1e9; refresh();
+  }catch(e){ $("herolog").lastElementChild.remove(); $("herolog").insertAdjacentHTML("beforeend", `<div class="msg ai">failed: ${esc(e)}</div>`); }
+}
 async function compareModels(){
   const v = $("heroin").value.trim(); if(!v){ alert("Type a prompt first."); return; }
   $("heroin").value = "";
@@ -412,7 +469,7 @@ async function newProject(){
   alert("Project '" + r.active + "' created with the KISS memory files — set its vision tiers, then build.");
 }
 async function addAsset(){
-  const kind = prompt("Asset type — cover, portrait, map, or title-card:", "cover");
+  const kind = prompt("Asset type — cover, logo, palette, banner, mockup, diagram, or card:", "cover");
   if(!kind) return;
   const p = prompt("Describe it (one line):", "");
   if(p === null) return;
@@ -466,7 +523,7 @@ function renderQs(r){
 async function runSurvey(){
   const body = { idea: CCIDEA.replace(/^survey me[:,]? */i, ""),
     qa: SQS.map((q,i)=>({q: q.q, a: $("sq"+i).value.trim()})) };
-  $("surveyout").textContent = "⚒ generating campaign + governed assets… (local models take a few minutes)";
+  $("surveyout").textContent = "⚒ generating creation doc + governed assets… (local models take a few minutes)";
   try{
     const r = await (await fetch("/api/campaign",{method:"POST",body:JSON.stringify(body)})).json();
     if(r.error){ $("surveyout").textContent = "failed: " + r.error; return; }

@@ -21,7 +21,7 @@ Works fully **offline** out of the box. With [Ollama](https://ollama.com) instal
 |---|---|---|
 | 🧠 **Reasoning Agents** (foundation) | Five-agent enterprise learning system: Learning Path Curator, Study Plan Generator, Engagement, Assessment (with a live **applied scope exam**), Manager Insights — planner-executor orchestration with a **critic that fails any uncited answer** | `foundry-track2/` |
 | 💼 **Enterprise Agents** (governance) | M365 Copilot **declarative agent** + Adaptive Cards rendering the engine's real decisions, readiness, and verification-debt alerts for managers | `m365-track3/` |
-| 🎨 **Creative Apps** (creative layer) | **KISS Campaign Studio**: adaptive intake survey → governed project → creation document + art assets, every one passing the **Asset Governor** (policy, cost-before-spend, verification queue) | `creative-track1/` + `command-center/` |
+| 🎨 **Creative Apps** (creative layer) | **KISS Intake Studio**: a domain-neutral adaptive intake survey → governed project → creation document + a governed asset kit (any domain — brand, app, course, event…), every asset passing the **Asset Governor** (policy, cost-before-spend, verification queue). An optional, fully isolated *Fantasy Campaign* template ships as a side example. | `creative-track1/` + `command-center/` |
 
 The scenario: fictional **"Pizza Shop Co."** runs an internal **KISS AI-Collaboration Certification** — employees learn to work with AI agents without scope creep or wasted tokens, and the *practical exam* is real scope governance on live (synthetic) projects.
 
@@ -62,4 +62,4 @@ Token trackers measure what you *already spent*. KISS estimates context cost **b
 
 ## Repo map
 
-`foundry-track2/` engine + IQ layers + evals · `command-center/` dashboard · `creative-track1/` campaign studio + asset governor + vision layer · `m365-track3/` declarative agent + cards + Teams mock · `demo-project/` seeded synthetic projects · `cli-skill/` Track 1 CLI origin · `docs/` demo script, judges brief, planning history · `GAP_ANALYSIS.md` living decision log
+`foundry-track2/` engine + IQ layers + evals · `command-center/` dashboard + Builder Studio · `creative-track1/` intake studio + asset governor + vision layer (+ `fantasy-template/`, an isolated optional example) · `m365-track3/` declarative agent + cards + Teams mock · `demo-project/` seeded synthetic projects · `cli-skill/` Track 1 CLI origin · `docs/` demo script, judges brief, planning history · `GAP_ANALYSIS.md` living decision log

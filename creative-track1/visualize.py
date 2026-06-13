@@ -65,26 +65,26 @@ def grounded_prompt(d):
         f"Central image: the goal — {d['goal']}.\n"
         f"Foreground (in warm light): the Tier 1 scope being built now: {', '.join(d['tier1'][:4]) or 'core features'}.\n"
         f"Shadowed regions at the edges: blockers — {', '.join(d['blocked']) or 'none currently'}.\n"
-        f"On distant islands across the water (visible but unreachable yet): parked ideas — {', '.join(d['parked']) or 'none'}.\n"
-        f"A road from foreground to horizon marks progress: {d['done']} steps laid, {d['open']} remaining.\n"
-        "Style: clean, hopeful, storybook-illustration; no text in the image; no real persons; original content only."
+        f"In a separate 'parked' lane (visible but not started yet): parked ideas — {', '.join(d['parked']) or 'none'}.\n"
+        f"A path from foreground to horizon marks progress: {d['done']} steps laid, {d['open']} remaining.\n"
+        "Style: clean, modern infographic; no text in the image; no real persons; original content only."
     )
 
 
 def svg_vision_board(d, path):
-    deep, accent, mid, light = "#16324f", "#e9a13b", "#9bc1bc", "#f4ecd8"
+    deep, accent, mid, light = "#1f2937", "#3b82f6", "#94a3b8", "#f1f5f9"
     def esc(s):
         return s.replace("&", "&amp;").replace("<", "&lt;")[:46]
     tier_items = "".join(
-        f'<text x="36" y="{170 + i * 19}" font-size="12.5" font-family="Georgia" fill="{light}">◆ {esc(t)}</text>'
+        f'<text x="36" y="{170 + i * 19}" font-size="12.5" font-family="Helvetica,Arial,sans-serif" fill="{light}">◆ {esc(t)}</text>'
         for i, t in enumerate(d["tier1"][:5]))
     shadows = "".join(
         f'<g opacity="0.85"><ellipse cx="{470 + (i % 2) * 60}" cy="{120 + i * 52}" rx="58" ry="20" fill="#000" opacity="0.35"/>'
-        f'<text x="{470 + (i % 2) * 60}" y="{124 + i * 52}" font-size="11" font-family="Georgia" fill="{light}" text-anchor="middle" opacity="0.9">{esc(b)}</text></g>'
+        f'<text x="{470 + (i % 2) * 60}" y="{124 + i * 52}" font-size="11" font-family="Helvetica,Arial,sans-serif" fill="{light}" text-anchor="middle" opacity="0.9">{esc(b)}</text></g>'
         for i, b in enumerate(d["blocked"][:3])) or ""
     islands = "".join(
         f'<g><path d="M{120 + i * 130} 96 q22 -16 46 0 q-6 12 -23 12 q-17 0 -23 -12 Z" fill="{deep}" opacity="0.75"/>'
-        f'<text x="{143 + i * 130}" y="88" font-size="10.5" font-family="Georgia" font-style="italic" fill="{mid}" text-anchor="middle">{esc(p)}</text></g>'
+        f'<text x="{143 + i * 130}" y="88" font-size="10.5" font-family="Helvetica,Arial,sans-serif" font-style="italic" fill="{mid}" text-anchor="middle">{esc(p)}</text></g>'
         for i, p in enumerate(d["parked"][:3]))
     total = max(1, d["open"] + d["done"])
     pct = d["done"] / total
@@ -93,20 +93,20 @@ def svg_vision_board(d, path):
 <radialGradient id="sun" cx="0.5" cy="0.4" r="0.6"><stop offset="0" stop-color="{accent}" stop-opacity="0.9"/><stop offset="1" stop-color="{accent}" stop-opacity="0"/></radialGradient></defs>
 <rect width="640" height="400" fill="url(#sky)"/>
 <ellipse cx="320" cy="120" rx="200" ry="80" fill="url(#sun)"/>
-<text x="320" y="46" font-size="22" font-family="Georgia" letter-spacing="2" fill="{light}" text-anchor="middle">{esc(d['name'])} — Vision Board</text>
-<text x="320" y="70" font-size="13" font-family="Georgia" font-style="italic" fill="{mid}" text-anchor="middle">{esc(d['goal'])}</text>
+<text x="320" y="46" font-size="22" font-family="Helvetica,Arial,sans-serif" letter-spacing="2" fill="{light}" text-anchor="middle">{esc(d['name'])} — Vision Board</text>
+<text x="320" y="70" font-size="13" font-family="Helvetica,Arial,sans-serif" font-style="italic" fill="{mid}" text-anchor="middle">{esc(d['goal'])}</text>
 <line x1="0" y1="110" x2="640" y2="110" stroke="{light}" stroke-width="1" opacity="0.5"/>
-<text x="608" y="104" font-size="10" font-family="Georgia" fill="{light}" opacity="0.8" text-anchor="end">horizon = deadline</text>
+<text x="608" y="104" font-size="10" font-family="Helvetica,Arial,sans-serif" fill="{light}" opacity="0.8" text-anchor="end">horizon = deadline</text>
 {islands}
 <path d="M0 270 Q120 232 240 256 T480 250 T640 246 V400 H0 Z" fill="{deep}"/>
 <rect x="24" y="142" width="250" height="{36 + 19 * max(1, len(d['tier1'][:5]))}" rx="8" fill="#000" opacity="0.25"/>
-<text x="36" y="150" font-size="12" font-family="Georgia" fill="{accent}" letter-spacing="2">BUILDING NOW (TIER 1)</text>
+<text x="36" y="150" font-size="12" font-family="Helvetica,Arial,sans-serif" fill="{accent}" letter-spacing="2">BUILDING NOW (TIER 1)</text>
 {tier_items}
 {shadows}
 <path d="M60 386 Q200 350 320 330 T610 296" stroke="{light}" stroke-width="3" stroke-dasharray="7 6" fill="none" opacity="0.9"/>
 <circle cx="{60 + 550 * pct}" cy="{386 - 90 * pct}" r="7" fill="{accent}"/>
-<text x="36" y="376" font-size="11.5" font-family="Georgia" fill="{light}">progress: {d['done']} done · {d['open']} open</text>
-<text x="320" y="394" font-size="10" font-family="Georgia" font-style="italic" fill="{mid}" text-anchor="middle">every element maps to project data — shadows = blockers · islands = parked ideas · road = TODO.md</text>
+<text x="36" y="376" font-size="11.5" font-family="Helvetica,Arial,sans-serif" fill="{light}">progress: {d['done']} done · {d['open']} open</text>
+<text x="320" y="394" font-size="10" font-family="Helvetica,Arial,sans-serif" font-style="italic" fill="{mid}" text-anchor="middle">every element maps to project data — shadows = blockers · parked lane = parked ideas · path = TODO.md</text>
 </svg>'''
     path.write_text(svg, encoding="utf-8")
 

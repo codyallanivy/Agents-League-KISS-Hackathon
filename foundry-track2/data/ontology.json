@@ -1,0 +1,48 @@
+{
+  "_comment": "Fabric IQ semantic layer (synthetic). Ontology connecting people, roles, certifications, skills, scope rules and decisions into unified business entities. All data is fabricated for demonstration.",
+  "entities": {
+    "certifications": [
+      {
+        "id": "KISS-101",
+        "name": "KISS Foundations: AI-Collaboration Basics",
+        "skills": ["Project memory files", "Snapshot vs log discipline", "Decision logging"],
+        "recommended_hours": 8,
+        "pass_threshold": 75,
+        "prerequisites": []
+      },
+      {
+        "id": "KISS-201",
+        "name": "KISS Practitioner: Scope Discipline & Token ROI",
+        "skills": ["Tier classification", "Scope-creep stop conditions", "Reading-set cost estimation", "Verification debt management"],
+        "recommended_hours": 14,
+        "pass_threshold": 75,
+        "prerequisites": ["KISS-101"]
+      },
+      {
+        "id": "KISS-301",
+        "name": "KISS Coach: Multi-Agent Governance",
+        "skills": ["Agent handoff context", "Risk policy authoring", "Retrospective facilitation", "Manager insight reporting"],
+        "recommended_hours": 20,
+        "pass_threshold": 80,
+        "prerequisites": ["KISS-201"]
+      }
+    ],
+    "roles": [
+      { "id": "ROLE-DEV", "name": "Developer", "required_certifications": ["KISS-101", "KISS-201"] },
+      { "id": "ROLE-PM", "name": "Project Manager", "required_certifications": ["KISS-101", "KISS-201", "KISS-301"] },
+      { "id": "ROLE-DES", "name": "Designer", "required_certifications": ["KISS-101"] }
+    ],
+    "scope_tiers": [
+      { "tier": 1, "meaning": "Current sprint / v1 launch scope. Build it.", "action": "proceed" },
+      { "tier": 2, "meaning": "Post-launch. Capture, don't build.", "action": "park_in_decisions" },
+      { "tier": 3, "meaning": "Vision-only. Capture, don't build.", "action": "park_in_decisions" }
+    ]
+  },
+  "rules": [
+    { "id": "R-1", "rule": "A learner is exam-ready when practice_score_avg >= pass_threshold AND hours_studied >= 0.75 * recommended_hours." },
+    { "id": "R-2", "rule": "A learner is at-risk when meeting_hours_per_week > 20 (low study completion correlation)." },
+    { "id": "R-3", "rule": "Prerequisite certifications must be passed before scheduling the next certification." },
+    { "id": "R-4", "rule": "Any feature request classified Tier 2 or 3 must be parked in DECISIONS.md with a revisit trigger, never built during the active sprint." },
+    { "id": "R-5", "rule": "Study blocks must be scheduled inside focus hours, never over meeting-heavy periods." }
+  ]
+}

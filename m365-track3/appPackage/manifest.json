@@ -1,0 +1,26 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/teams/v1.19/MicrosoftTeams.schema.json",
+  "manifestVersion": "1.19",
+  "version": "1.0.0",
+  "id": "b7e9f3a2-0000-4000-a000-kiss00000001",
+  "developer": {
+    "name": "DigitalQuill Labs (hackathon demo)",
+    "websiteUrl": "https://github.com/codyallanivy/Agents-League-KISS-Hackathon",
+    "privacyUrl": "https://github.com/codyallanivy/Agents-League-KISS-Hackathon#privacy",
+    "termsOfUseUrl": "https://github.com/codyallanivy/Agents-League-KISS-Hackathon#terms"
+  },
+  "name": { "short": "KISS Governance", "full": "KISS Governance Agent for M365 Copilot" },
+  "description": {
+    "short": "Govern AI-assisted projects: scope decisions, readiness, verification debt.",
+    "full": "Manager-facing governance agent surfacing the KISS reasoning engine's outputs in Microsoft 365 Copilot: certification readiness by team, ACCEPT/WARN/BLOCK scope decisions with reasoning traces, parked-feature decision log, and verification-debt alerts. Synthetic demo data only."
+  },
+  "icons": { "color": "color.png", "outline": "outline.png" },
+  "accentColor": "#B1532F",
+  "copilotAgents": {
+    "declarativeAgents": [
+      { "id": "kissGovernanceAgent", "file": "declarativeAgent.json" }
+    ]
+  },
+  "permissions": ["identity"],
+  "validDomains": []
+}

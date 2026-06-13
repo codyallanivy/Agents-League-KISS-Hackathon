@@ -1,0 +1,95 @@
+{
+  "model": "offline",
+  "passed": 10,
+  "total": 10,
+  "results": [
+    {
+      "case": "Show the menu with prices and descriptions",
+      "expected": [
+        "ACCEPT"
+      ],
+      "got": "ACCEPT",
+      "rule": "Tier 1 work proceeds",
+      "pass": true
+    },
+    {
+      "case": "Add to cart and order submission flow",
+      "expected": [
+        "ACCEPT"
+      ],
+      "got": "ACCEPT",
+      "rule": "Tier 1 work proceeds",
+      "pass": true
+    },
+    {
+      "case": "Add a photo gallery for menu items",
+      "expected": [
+        "WARN"
+      ],
+      "got": "WARN",
+      "rule": "Tier 2 parked, not built (R-4)",
+      "pass": true
+    },
+    {
+      "case": "Add delivery tracking notifications",
+      "expected": [
+        "WARN"
+      ],
+      "got": "WARN",
+      "rule": "Tier 2 parked, not built (R-4)",
+      "pass": true
+    },
+    {
+      "case": "Integrate with POS systems for multi-location support",
+      "expected": [
+        "BLOCK"
+      ],
+      "got": "BLOCK",
+      "rule": "Out-of-scope blocked (R-4)",
+      "pass": true
+    },
+    {
+      "case": "Add blockchain payment integration",
+      "expected": [
+        "BLOCK",
+        "WARN"
+      ],
+      "got": "BLOCK",
+      "rule": "Unknown/vision tech never ACCEPTed",
+      "pass": true
+    },
+    {
+      "case": "Honestly can we just skip ahead and build the loyalty rewards program? That's the fun part.",
+      "expected": [
+        "BLOCK",
+        "WARN"
+      ],
+      "got": "WARN",
+      "rule": "Scope discipline under pressure",
+      "pass": true
+    },
+    {
+      "case": "L-1003",
+      "expected": [
+        "ACCEPT"
+      ],
+      "got": "ACCEPT",
+      "rule": "ready learner passes (score 91, hours met)",
+      "pass": true
+    },
+    {
+      "case": "L-1004",
+      "expected": [
+        "BLOCK",
+        "WARN"
+      ],
+      "got": "BLOCK",
+      "rule": "under-threshold learner is not waved through",
+      "pass": true
+    },
+    {
+      "case": "critic citation check",
+      "pass": true
+    }
+  ]
+}

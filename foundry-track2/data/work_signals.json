@@ -1,0 +1,7 @@
+[
+  { "employee_id": "L-1001", "meeting_hours_per_week": 22, "focus_hours_per_week": 8, "preferred_learning_slot": "Morning" },
+  { "employee_id": "L-1002", "meeting_hours_per_week": 14, "focus_hours_per_week": 16, "preferred_learning_slot": "Afternoon" },
+  { "employee_id": "L-1003", "meeting_hours_per_week": 10, "focus_hours_per_week": 20, "preferred_learning_slot": "Morning" },
+  { "employee_id": "L-1004", "meeting_hours_per_week": 18, "focus_hours_per_week": 12, "preferred_learning_slot": "Evening" },
+  { "employee_id": "L-1005", "meeting_hours_per_week": 25, "focus_hours_per_week": 6, "preferred_learning_slot": "Morning" }
+]

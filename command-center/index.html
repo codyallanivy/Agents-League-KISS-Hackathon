@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>KISS Command Center</title>
+<style>
+  :root { --bg:#0b0e14; --panel:#121826; --edge:#1f2a3d; --ink:#d7e0ee; --dim:#7b8aa3;
+          --gold:#e9a13b; --good:#3ecf8e; --warn:#e9c46a; --bad:#e76f51; --acc:#5b8af5; }
+  * { margin:0; padding:0; box-sizing:border-box; font-family:"Cascadia Code","Consolas",monospace; }
+  body { background:var(--bg) url('/assets/matrix-quill.png') no-repeat right -120px top -80px; background-size:480px; color:var(--ink); min-height:100vh; padding:18px; }
+  body::before { content:""; position:fixed; inset:0; background:linear-gradient(90deg, var(--bg) 55%, rgba(11,14,20,0.88)); pointer-events:none; }
+  header, .view { position:relative; z-index:1; }
+  header { display:flex; align-items:center; gap:12px; margin-bottom:14px; flex-wrap:wrap; }
+  header img.logo { width:40px; height:40px; border-radius:10px; }
+  header h1 { font-size:18px; letter-spacing:3px; color:var(--gold); font-weight:600; }
+  .badge { padding:4px 12px; border-radius:20px; font-size:12px; border:1px solid var(--edge); }
+  .b-foundry { color:#7ab8ff; border-color:#7ab8ff; } .b-ollama { color:var(--good); border-color:var(--good); }
+  .b-offline { color:var(--dim); border-color:var(--dim); }
+  .sub { color:var(--dim); font-size:11.5px; }
+  select { background:#0e1420; border:1px solid var(--gold); color:var(--gold); border-radius:6px; padding:6px 10px; font-family:inherit; font-size:12px; }
+  .tabs { display:flex; gap:6px; margin-bottom:14px; position:relative; z-index:1; }
+  .tab { padding:8px 18px; border-radius:8px 8px 0 0; cursor:pointer; font-size:12px; letter-spacing:1.5px; color:var(--dim); border:1px solid var(--edge); border-bottom:none; background:#0e1420; }
+  .tab.on { color:var(--gold); border-color:var(--gold); background:var(--panel); }
+  .view { display:none; } .view.on { display:block; }
+  .grid { display:grid; grid-template-columns:1.2fr 1fr 1fr; gap:14px; }
+  @media (max-width:1100px){ .grid{ grid-template-columns:1fr; } }
+  .panel { background:var(--panel); border:1px solid var(--edge); border-radius:10px; padding:14px; min-height:100px; }
+  .panel h2 { font-size:11px; letter-spacing:2.5px; color:var(--gold); margin-bottom:10px; text-transform:uppercase; }
+  .col-span { grid-column:1 / -1; }
+  input, button { background:#0e1420; border:1px solid var(--edge); color:var(--ink); border-radius:6px; padding:8px 10px; font-size:13px; font-family:inherit; }
+  input { flex:1; } button { cursor:pointer; color:var(--gold); border-color:var(--gold); }
+  button:hover { background:var(--gold); color:#0b0e14; }
+  .row { display:flex; gap:8px; margin-bottom:10px; }
+  .msg { padding:9px 11px; border-radius:8px; font-size:12.5px; line-height:1.55; white-space:pre-wrap; }
+  .me { background:#1a2436; align-self:flex-end; max-width:85%; }
+  .ai { background:#0e1726; border-left:3px solid var(--gold); max-width:95%; }
+  .cite { color:var(--dim); font-size:10.5px; margin-top:5px; }
+  .verdict { font-weight:700; } .ACCEPT { color:var(--good); } .WARN { color:var(--warn); } .BLOCK { color:var(--bad); }
+  .kcol { margin-bottom:10px; } .kcol b { font-size:10.5px; letter-spacing:1.6px; color:var(--dim); }
+  .titem { display:flex; align-items:flex-start; gap:7px; font-size:12px; padding:5px 8px; background:#0e1726; border-radius:5px; margin-top:5px; border-left:3px solid var(--acc); }
+  .titem input { flex:none; margin-top:2px; accent-color:var(--gold); }
+  .kcol.done .titem { border-left-color:var(--good); opacity:.7; }
+  .kcol.blocked .titem { border-left-color:var(--bad); }
+  .trace { font-size:11px; color:var(--dim); padding:7px 9px; background:#0e1726; border-radius:5px; margin-bottom:6px; }
+  .trace b { color:var(--acc); } .trace .m { color:var(--gold); } .trace .a { color:var(--ink); display:block; margin-top:3px; }
+  .hint { color:var(--dim); font-size:11px; font-style:italic; }
+  .pop-q { font-size:11px; margin:7px 0 2px; }
+  input[type=range] { width:100%; accent-color:var(--gold); padding:0; }
+  .pop-score { display:flex; align-items:baseline; gap:10px; border-top:1px solid var(--edge); margin-top:10px; padding-top:8px; }
+  .pop-score .n { font-size:28px; color:var(--gold); }
+  .roi-row, .model-row { display:flex; justify-content:space-between; align-items:center; font-size:12px; padding:6px 8px; background:#0e1726; border-radius:5px; margin-bottom:5px; }
+  .roi-row .t { color:var(--acc); }
+  .model-row input { max-width:64px; padding:3px 6px; font-size:11.5px; }
+  .hw { font-size:11.5px; padding:6px 9px; border-radius:5px; margin-bottom:5px; background:#241a12; border-left:3px solid var(--warn); }
+  .hok { font-size:11.5px; padding:6px 9px; border-radius:5px; background:#10231c; border-left:3px solid var(--good); }
+  .nb { font-size:12.5px; line-height:1.6; }
+  .nb b { color:var(--good); } .nb .wait { color:var(--bad); }
+  #visionwrap svg, #visionwrap3 svg { width:100%; height:auto; border-radius:8px; }
+  /* View 1 */
+  .hero { max-width:760px; margin:4vh auto 0; text-align:center; }
+  .hero img { width:96px; height:96px; border-radius:22px; margin-bottom:14px; }
+  .hero h2 { color:var(--ink); font-size:22px; font-weight:500; margin-bottom:6px; }
+  .hero p { color:var(--dim); font-size:13px; margin-bottom:22px; }
+  #herolog { text-align:left; display:flex; flex-direction:column; gap:8px; max-height:42vh; overflow-y:auto; margin-bottom:14px; }
+  .modes { display:flex; gap:10px; justify-content:center; margin-top:22px; flex-wrap:wrap; }
+  .mode { background:var(--panel); border:1px solid var(--edge); border-radius:12px; padding:16px 20px; cursor:pointer; width:260px; text-align:left; }
+  .mode:hover { border-color:var(--gold); }
+  .mode b { color:var(--gold); display:block; margin-bottom:5px; font-size:13px; }
+  .mode span { color:var(--dim); font-size:11.5px; line-height:1.5; }
+  /* View 3 */
+  .gallery { display:grid; grid-template-columns:repeat(auto-fill, minmax(190px, 1fr)); gap:12px; }
+  .gallery img { width:100%; border-radius:8px; border:1px solid var(--edge); background:#0e1726; }
+</style>
+</head>
+<body>
+<header>
+  <img class="logo" src="/assets/brand-logo.png" alt="">
+  <h1>⬡ KISS COMMAND CENTER</h1>
+  <span class="badge b-offline" id="modelbadge">…</span>
+  <select id="modelsel" onchange="switchModel(this.value)"></select>
+  <select id="projsel" onchange="switchProject(this.value)"></select>
+  <button onclick="newProject()" title="Start a blank KISS project" style="padding:5px 10px;font-size:12px">✚ new</button>
+  <button onclick="addProject()" title="Add a project folder the scanner did not find" style="padding:5px 10px;font-size:12px">+ folder</button>
+  <span class="sub" id="statusline"></span>
+</header>
+<div class="tabs">
+  <div class="tab on" data-v="v1" onclick="tab('v1')">⌂ ASSISTANT</div>
+  <div class="tab" data-v="v2" onclick="tab('v2')">▦ PROJECT OPS</div>
+  <div class="tab" data-v="v3" onclick="tab('v3')">✦ CREATIVE STUDIO</div>
+</div>
+
+<div class="view on" id="v1">
+  <div class="hero">
+    <img src="/assets/bottle-logo.png" alt="">
+    <h2>What are we building today?</h2>
+    <p>Local-first. Your files never leave this machine. The brain behind every answer is your own project memory.</p>
+    <div id="herolog"></div>
+    <div class="row"><input id="heroin" placeholder="ask anything — or describe an idea…"><button onclick="heroSend()">Send</button><button onclick="compareModels()" title="Run this prompt through every model tier side by side">⚖ Compare</button></div>
+    <div class="modes">
+      <div class="mode" onclick="tab('v2')"><b>📋 Project planning mode</b><span>Run a real project with KISS discipline — board, scope gate, ROI, health, decisions.</span></div>
+      <div class="mode" onclick="tab('v3')"><b>✨ Creative mode</b><span>Generate a campaign or assets for fun — same governance, more art.</span></div>
+    </div>
+  </div>
+</div>
+
+<div class="view" id="v2">
+  <div class="grid">
+    <div class="panel">
+      <h2>Ask the Engine</h2>
+      <div id="chatlog" style="max-height:280px;overflow-y:auto;display:flex;flex-direction:column;gap:8px"></div>
+      <div class="row" style="margin-top:10px"><input id="chatin" placeholder="ask the KISS coach…"><button onclick="send()">Send</button></div>
+    </div>
+    <div class="panel">
+      <h2>Scope Gate ✅⚠️🚫 <span class="sub" id="scopeproj"></span></h2>
+      <div class="row"><input id="scopein" placeholder='try: "add multiplayer pizza battles"'><button onclick="scope()">Check</button></div>
+      <div id="scopelog" style="max-height:240px;overflow-y:auto;display:flex;flex-direction:column;gap:8px"></div>
+    </div>
+    <div class="panel">
+      <h2>The Board <span class="sub">(click to check off)</span>
+        <a href="/api/calendar.ics" style="float:right;color:var(--acc);font-size:10px;letter-spacing:1px;text-decoration:none" title="Export open tasks as calendar events (Outlook / Google / Apple)">📅 → CALENDAR</a></h2>
+      <div id="board"></div>
+    </div>
+    <div class="panel">
+      <h2>Optimal Workflow &amp; Next Best Work</h2>
+      <div class="nb" id="nextbest"></div>
+    </div>
+    <div class="panel">
+      <h2>Context ROI Coach</h2>
+      <div id="roi"></div>
+      <div id="roitotal" class="sub" style="margin:6px 0"></div>
+      <div id="models3"></div>
+      <p class="hint">Pre-spend reading cost — a planning tool, not an accountant. Computed locally.</p>
+    </div>
+    <div class="panel">
+      <h2>The Popsicle Test <span class="sub">(evidence-seeded)</span></h2>
+      <div id="pop"></div>
+      <div class="pop-score"><span class="n" id="popn">–</span><span id="popv" class="hint"></span></div>
+      <p class="hint" id="popev"></p>
+    </div>
+    <div class="panel">
+      <h2>Project Health <span class="sub">· conflict radar</span></h2>
+      <div id="health"></div>
+    </div>
+    <div class="panel">
+      <h2>Memo &amp; Idea Inbox</h2>
+      <div class="row"><input id="memoin" placeholder="capture a loose idea…"><button onclick="addMemo()">Park it</button></div>
+      <div id="memos" style="font-size:11.5px;color:var(--dim);max-height:160px;overflow-y:auto"></div>
+    </div>
+    <div class="panel">
+      <h2>Latest From the Log</h2>
+      <div id="log" style="font-size:11.5px;color:var(--dim);white-space:pre-wrap;max-height:180px;overflow-y:auto"></div>
+    </div>
+    <div class="panel col-span">
+      <h2>Data Explorer <span class="sub">— one query across traces, decisions, knowledge (Foundry IQ), ontology (Fabric IQ), work signals (Work IQ), learners</span></h2>
+      <div class="row">
+        <select id="qsrc" style="border-color:var(--edge);color:var(--ink)">
+          <option value="">all sources</option><option>traces</option><option>decisions</option>
+          <option>knowledge</option><option>ontology</option><option>work</option><option>learners</option>
+        </select>
+        <input id="tracein" placeholder='try "prerequisite", "blockchain", "meeting hours", "R-4"…'>
+        <button onclick="loadTraces()">Query</button>
+      </div>
+      <div id="traces" style="max-height:300px;overflow-y:auto"></div>
+    </div>
+  </div>
+</div>
+
+<div class="view" id="v3">
+  <div class="grid" style="grid-template-columns:1.1fr 1fr">
+    <div class="panel" style="display:flex;flex-direction:column;min-height:560px">
+      <h2>🎨 Creative Chat <span class="sub">— create &amp; edit your project by talking · <span id="ccproj"></span></span></h2>
+      <div id="cclog" style="flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:8px">
+        <div class="msg ai">Tell me what you're building ("survey me: a coffee shop brand") and I'll interview you.
+Or just talk about the active project — I can read its files — and say things like "make act 2 darker" or "rewrite the premise" to edit the creation document directly.</div>
+      </div>
+      <div id="s_qs"></div>
+      <div class="row" style="margin-top:10px"><input id="ccin" placeholder='try "survey me: …" or "change the ending to…"'><button onclick="ccSend()">Send</button></div>
+      <p class="hint" id="surveyout">survey me → tailored intake · edit/change/rewrite → updates the creation doc (previous kept) · anything else → file-grounded chat</p>
+    </div>
+    <div class="panel" style="min-height:560px">
+      <h2>Vision Board <span class="sub">(docs → visual understanding)</span></h2>
+      <div id="visionwrap3"><p class="hint">no vision board yet for this project</p></div>
+      <div class="row" style="margin-top:10px"><button onclick="genVision()">⟳ Regenerate (governed)</button><span class="sub" id="visout" style="align-self:center"></span></div>
+    </div>
+    <div class="panel col-span">
+      <h2>Asset Gallery <span class="sub" id="galleryproj"></span>
+        <span style="float:right">
+          <button onclick="addAsset()" style="padding:3px 10px;font-size:11px" title="Generate one more asset (governed)">➕ asset</button>
+          <button onclick="verifyAssets()" style="padding:3px 10px;font-size:11px" id="verifybtn" title="Mark everything in the gallery as human-reviewed">✓ mark reviewed</button>
+        </span></h2>
+      <div class="gallery" id="gallery"></div>
+      <p class="hint" style="margin-top:10px">✏️ AI on any asset edits it in place (governed, original kept). Offline art is deterministic by design — same files, same art; model tiers add variation. The chat reads these SVGs too.</p>
+    </div>
+  </div>
+</div>
+<div id="bmodal" style="display:none;position:fixed;inset:0;background:rgba(5,8,14,.8);z-index:50;align-items:center;justify-content:center">
+  <div style="background:var(--panel);border:1px solid var(--gold);border-radius:12px;width:520px;max-width:92vw;padding:16px">
+    <h2 style="font-size:12px;letter-spacing:2px;color:var(--gold);margin-bottom:8px">FIND YOUR PROJECT FOLDER</h2>
+    <div id="bpath" class="sub" style="margin-bottom:8px;word-break:break-all"></div>
+    <div id="blist" style="max-height:46vh;overflow-y:auto;margin-bottom:12px"></div>
+    <button id="bselect" onclick="pickFolder()" style="width:100%;margin-bottom:8px;padding:11px;font-size:13px">Use this folder</button>
+    <div class="row" style="margin:0">
+      <button onclick="$('bmodal').style.display='none'" style="color:var(--dim);border-color:var(--dim)">Cancel</button>
+    </div>
+    <p class="hint" style="margin-top:8px">⬡ = already a KISS project. Any other folder can be onboarded — your files are never modified.</p>
+  </div>
+</div>
+<style>.brow{padding:7px 10px;border-radius:6px;cursor:pointer;font-size:12.5px}.brow:hover{background:#1a2436}</style>
+<script>
+const $ = id => document.getElementById(id);
+const esc = s => (s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;");
+let ACTIVE = "";
+
+function tab(v){
+  document.querySelectorAll(".tab").forEach(t=>t.classList.toggle("on", t.dataset.v===v));
+  document.querySelectorAll(".view").forEach(x=>x.classList.toggle("on", x.id===v));
+  if(v==="v3"){ loadGallery(); loadVision(); $("ccproj").textContent = ACTIVE; }
+}
+async function safe(fn){ try{ await fn(); }catch(e){ console.warn(fn.name, e); } }
+async function status(){
+  const s = await (await fetch("/api/status")).json();
+  ACTIVE = s.active; s.models = s.models || [s.model]; s.projects = s.projects || [];
+  const b = $("modelbadge"), tier = s.model.split(":")[0];
+  b.textContent = s.model.toUpperCase();
+  b.className = "badge b-" + (tier==="foundry"?"foundry":tier==="ollama"?"ollama":"offline");
+  $("statusline").textContent = `${s.chunks} chunks · local-first`;
+  $("modelsel").innerHTML = s.models.map(m=>`<option ${m===s.model?"selected":""}>${m}</option>`).join("");
+  $("projsel").innerHTML = s.projects.map(p=>`<option ${p===s.active?"selected":""}>${p}</option>`).join("");
+  $("scopeproj").textContent = "· " + ACTIVE; $("galleryproj").textContent = "· " + ACTIVE;
+}
+async function switchModel(m){
+  await fetch("/api/model",{method:"POST",body:JSON.stringify({mode:m})});
+  status();
+}
+async function switchProject(p){
+  await fetch("/api/project",{method:"POST",body:JSON.stringify({project:p})});
+  ACTIVE = p; refresh();
+}
+let BROWSE = "", BDIRS = [], BPARENT = null;
+async function addProject(){ openBrowser(""); }
+async function openBrowser(path){
+  const b = await (await fetch("/api/browse?path="+encodeURIComponent(path))).json();
+  if(b.error){ alert(b.error); return; }
+  BROWSE = b.path; BDIRS = b.dirs || []; BPARENT = b.parent;
+  $("bpath").textContent = b.path || "Select a drive";
+  const sel = $("bselect");
+  sel.style.display = b.path ? "block" : "none";
+  if(b.is_kiss){ sel.textContent = "✓ Open this KISS project"; sel.style.borderColor = "var(--good)"; sel.style.color = "var(--good)"; }
+  else { sel.textContent = "⬡ Onboard THIS folder into KISS (creates the memory files — your files untouched)"; sel.style.borderColor = "var(--gold)"; sel.style.color = "var(--gold)"; }
+  let rows = "";
+  if(BPARENT !== null && b.path) rows += `<div class="brow" onclick="openBrowser(BPARENT)">⬑ .. (up)</div>`;
+  rows += BDIRS.map((d,i)=>`<div class="brow" onclick="openIdx(${i})">${d.kiss?"⬡":"📁"} ${esc(d.name)}${d.kiss?' <span class="sub">KISS project</span>':""}</div>`).join("");
+  $("blist").innerHTML = rows || '<p class="hint">no subfolders here — use the button below to onboard this folder</p>';
+  $("bmodal").style.display = "flex";
+}
+function openIdx(i){
+  const d = BDIRS[i];
+  const sep = (!BROWSE || BROWSE.includes("\\")) ? "\\" : "/";
+  const full = BROWSE ? (BROWSE.endsWith(sep) ? BROWSE + d.name : BROWSE + sep + d.name) : d.name;
+  openBrowser(full);
+}
+async function pickFolder(){
+  $("bmodal").style.display = "none";
+  const res = await fetch("/api/add-project",{method:"POST",body:JSON.stringify({path:BROWSE})});
+  const r = await res.json();
+  if(r.offer_init){
+    if(confirm(r.message + "\n\n(Creates PROJECT_STATE, TODO, DECISIONS, RISK_POLICY, PRODUCT_VISION, READ_FIRST, PENDING_VERIFICATION)")){
+      const r2 = await (await fetch("/api/init-project",{method:"POST",body:JSON.stringify({path:r.path})})).json();
+      if(r2.error){ alert(r2.error); return; }
+      ACTIVE = r2.active; refresh();
+      alert("Project onboarded ✓ Created: " + r2.created.join(", ") + "\n\nYour existing files were untouched — they're listed as imported sources in PROJECT_STATE.md.");
+    }
+    return;
+  }
+  if(r.error){ alert("Could not add project:\n\n" + r.error); return; }
+  ACTIVE = r.active; refresh();
+}
+function refresh(){ [status, loadBoard, loadRoi, loadHealth, loadPop, loadNext, loadMemos, loadLog, loadTraces, loadVision, loadGallery].forEach(f=>safe(f)); }
+
+async function ask(input, logdiv){
+  const v = $(input).value.trim(); if(!v) return; $(input).value="";
+  $(logdiv).insertAdjacentHTML("beforeend", `<div class="msg me">${esc(v)}</div>`);
+  $(logdiv).insertAdjacentHTML("beforeend", `<div class="msg ai hint">thinking…</div>`);
+  $(logdiv).scrollTop = 1e9;
+  const r = await (await fetch("/api/chat",{method:"POST",body:JSON.stringify({message:v})})).json();
+  $(logdiv).lastElementChild.outerHTML = `<div class="msg ai">${esc(r.answer)}<div class="cite">${esc((r.cites||[]).join(" · "))}</div></div>`;
+  $(logdiv).scrollTop = 1e9; loadTraces();
+}
+const send = () => ask("chatin","chatlog");
+const heroSend = () => ask("heroin","herolog");
+async function compareModels(){
+  const v = $("heroin").value.trim(); if(!v){ alert("Type a prompt first."); return; }
+  $("heroin").value = "";
+  $("herolog").insertAdjacentHTML("beforeend", `<div class="msg me">⚖ compare: ${esc(v)}</div>`);
+  $("herolog").insertAdjacentHTML("beforeend", `<div class="msg ai hint">running the same prompt through every model tier… (local models take a while)</div>`);
+  $("herolog").scrollTop = 1e9;
+  const r = await (await fetch("/api/compare",{method:"POST",body:JSON.stringify({message:v})})).json();
+  $("herolog").lastElementChild.remove();
+  const tierColor = m => m.startsWith("foundry") ? "#7ab8ff" : m.startsWith("ollama") ? "var(--good)" : "var(--dim)";
+  window.LASTCMP = {prompt: v, results: r.results};
+  const cols = r.results.map((x,i) =>
+    `<div style="flex:1;min-width:200px;background:#0e1726;border-top:3px solid ${tierColor(x.mode)};border-radius:8px;padding:10px">
+       <div style="font-size:11px;letter-spacing:1.5px;color:${tierColor(x.mode)};margin-bottom:6px">${esc(x.mode.toUpperCase())} · ${x.seconds}s</div>
+       <div style="font-size:12px;line-height:1.55;white-space:pre-wrap">${esc(x.answer)}</div>
+       ${x.cites.length?`<div class="cite">${esc(x.cites.join(" · "))}</div>`:""}
+       <button onclick="prefer(${i})" style="margin-top:8px;padding:3px 10px;font-size:11px" title="Save as a preference pair for future fine-tuning">👍 prefer this</button>
+     </div>`).join("");
+  $("herolog").insertAdjacentHTML("beforeend", `<div style="display:flex;gap:10px;flex-wrap:wrap">${cols}</div>`);
+  $("herolog").scrollTop = 1e9; loadTraces();
+}
+
+async function scope(){
+  const v = $("scopein").value.trim(); if(!v) return;
+  const r = await (await fetch("/api/scope",{method:"POST",body:JSON.stringify({request:v})})).json();
+  $("scopelog").insertAdjacentHTML("afterbegin",
+    `<div class="msg ai"><span class="verdict ${r.verdict}">${r.verdict}</span> — Tier ${r.tier}\n${esc(r.answer)}<div class="cite">critic: ${r.critic}</div></div>`);
+  loadTraces();
+}
+async function loadBoard(){
+  const b = await (await fetch("/api/board")).json();
+  const item = (t, mark, col) => `<div class="titem"><input type="checkbox" ${mark==="x"?"checked":""} ${col==="blocked"?"disabled":""} onchange="toggleTodo('${esc(t).replace(/'/g,"\\'")}', this.checked)"><span>${esc(t)}</span></div>`;
+  $("board").innerHTML =
+    `<div class="kcol"><b>NOW (${b.now.length})</b>${b.now.map(t=>item(t," ","now")).join("")}</div>` +
+    `<div class="kcol blocked"><b>BLOCKED (${b.blocked.length})</b>${b.blocked.map(t=>item(t,"~","blocked")).join("")}</div>` +
+    `<div class="kcol done"><b>DONE (${b.done.length})</b>${b.done.map(t=>item(t,"x","done")).join("")}</div>`;
+}
+async function toggleTodo(line, done){
+  await fetch("/api/todo",{method:"POST",body:JSON.stringify({line, done})});
+  loadBoard(); loadHealth(); loadNext(); loadPop();
+}
+const TIERS = [["Budget",0.5],["Standard",3],["Frontier",15]];
+async function loadRoi(){
+  const r = await (await fetch("/api/roi")).json();
+  $("roi").innerHTML = r.sets.map(x=>`<div class="roi-row"><span class="t">${esc(x.set)}</span><span>${x.tokens.toLocaleString()} tok</span></div>`).join("");
+  $("roitotal").textContent = `Total context to load everything: ${r.total_tokens.toLocaleString()} tok`;
+  $("models3").innerHTML = TIERS.map(([n,p],i)=>
+    `<div class="model-row"><span>${n}</span><input type="number" step="0.5" value="${p}" id="tier${i}" oninput="roiPrices(${r.total_tokens})"><span id="tierc${i}">$${(r.total_tokens/1e6*p).toFixed(4)}</span></div>`).join("");
+}
+function roiPrices(total){
+  TIERS.forEach((t,i)=>{ $("tierc"+i).textContent = "$" + (total/1e6*(parseFloat($("tier"+i).value)||0)).toFixed(4); });
+}
+async function loadHealth(){
+  const h = await (await fetch("/api/health")).json();
+  $("health").innerHTML = h.ok ? `<div class="hok">✓ All files within healthy limits. Your studio is lean — nice and cheap to run.</div>`
+    : h.warnings.map(w=>`<div class="hw">⚠ ${esc(w)}</div>`).join("");
+}
+const POPQ = [["built","Is your idea actually shipping?"],["control","Is the AI building WITH you — you in control?"],
+  ["time","Is your time respected (no re-explaining)?"],["compute","Is your compute well spent?"],["proud","Proud to ship what you have?"]];
+async function loadPop(){
+  const seed = await (await fetch("/api/popsicle")).json();
+  const key = "kiss_pop_" + ACTIVE;
+  const saved = JSON.parse(localStorage.getItem(key) || "null");
+  $("pop").innerHTML = POPQ.map(([k,q])=>
+    `<div class="pop-q">${q}</div><input type="range" min="0" max="100" value="${saved?.[k] ?? seed[k]}" data-k="${k}" oninput="popScore()">`).join("");
+  $("popev").textContent = "evidence: " + seed.evidence;
+  popScore(false);
+}
+function popScore(save=true){
+  const key = "kiss_pop_" + ACTIVE, store = {};
+  let sum=0, inputs=$("pop").querySelectorAll("input[data-k]");
+  inputs.forEach(i=>{ store[i.dataset.k]=+i.value; sum+=+i.value; });
+  if(save) localStorage.setItem(key, JSON.stringify(store));
+  const score = Math.round(sum/inputs.length);
+  $("popn").textContent = score;
+  // Dynamic Popsicle Index verdict bands (from DYNAMIC_POPSICLE_INDEX.md)
+  const v = score>=88?["Excellent — shipping, thrifty, verified.","var(--good)"]:score>=74?["Strong — the human's better off.","var(--good)"]
+        :score>=58?["Mixed — progress, but unverified work is dragging it.","var(--warn)"]:["Weak signal — be honest: is this worth the compute?","var(--bad)"];
+  $("popv").textContent = v[0]; $("popv").style.color = v[1];
+}
+async function loadNext(){
+  const n = await (await fetch("/api/nextbest")).json();
+  $("nextbest").innerHTML = `Mode: <b>${esc(n.mode)}</b> — ${esc(n.why)}.<br><br>→ <b>${esc(n.task)}</b><br><span class="wait">✋ tempting but wait: ${esc(n.tempting_but_wait)}</span>`;
+}
+async function loadMemos(){
+  const m = await (await fetch("/api/memo")).json();
+  $("memos").innerHTML = m.map(x=>`<div>· ${esc(x)}</div>`).join("") || '<span class="hint">empty — park loose ideas here instead of building them</span>';
+}
+async function addMemo(){
+  const v = $("memoin").value.trim(); if(!v) return; $("memoin").value="";
+  await fetch("/api/memo",{method:"POST",body:JSON.stringify({text:v})});
+  loadMemos();
+}
+async function loadLog(){
+  const l = await (await fetch("/api/log")).json();
+  $("log").textContent = l.join("\n\n———\n\n") || "no iterations logged yet";
+}
+async function loadTraces(){
+  const q = $("tracein").value.trim(), srcf = $("qsrc") ? $("qsrc").value : "";
+  const rows = await (await fetch("/api/query?q="+encodeURIComponent(q)+"&source="+encodeURIComponent(srcf))).json();
+  const tag = {traces:"var(--acc)",decisions:"var(--gold)",knowledge:"var(--good)",ontology:"#c77dff",work:"var(--warn)",learners:"#7ab8ff"};
+  $("traces").innerHTML = rows.map(r=>
+    `<div class="trace"><b style="color:${tag[r.src]||'var(--dim)'}">[${esc(r.src)}]</b> ${r.agent?`<b>${esc(r.agent)}</b> <span class="m">${esc(r.model)}</span> ${esc(r.ts)}`:""}${r.citation?`<b>${esc(r.citation)}</b>`:""}<span class="a">${esc(r.text)}</span>${r.cites&&r.cites.length?`<span>cites: ${esc(r.cites.join(" · "))}</span>`:""}</div>`).join("")
+    || '<p class="hint">no matches across sources</p>';
+}
+async function loadVision(){
+  const v = await (await fetch("/api/vision")).json();
+  if(v.svg) $("visionwrap3").innerHTML = v.svg;
+}
+async function genVision(){
+  $("visout").textContent = "generating (governed)…";
+  const r = await (await fetch("/api/visualize",{method:"POST",body:"{}"})).json();
+  $("visout").textContent = r.ok ? "done ✓" : "failed";
+  if(!r.ok) alert("Vision board generation failed:\n\n" + (r.out || "no output"));
+  loadVision(); loadGallery();
+}
+async function newProject(){
+  const name = prompt("Name the new project:");
+  if(!name) return;
+  const r = await (await fetch("/api/new-project",{method:"POST",body:JSON.stringify({name})})).json();
+  if(r.error){ alert(r.error); return; }
+  ACTIVE = r.active; refresh();
+  alert("Project '" + r.active + "' created with the KISS memory files — set its vision tiers, then build.");
+}
+async function addAsset(){
+  const kind = prompt("Asset type — cover, portrait, map, or title-card:", "cover");
+  if(!kind) return;
+  const p = prompt("Describe it (one line):", "");
+  if(p === null) return;
+  const r = await (await fetch("/api/add-asset",{method:"POST",body:JSON.stringify({kind:kind.trim(), prompt:p})})).json();
+  if(r.error){ alert(r.error); return; }
+  loadGallery(); loadHealth();
+}
+async function verifyAssets(){
+  const r = await (await fetch("/api/verify-assets",{method:"POST",body:"{}"})).json();
+  alert("✓ " + r.verified + " item(s) marked reviewed — verification debt cleared, logged to ITERATION_LOG.");
+  loadGallery(); loadHealth(); loadNext(); loadPop();
+}
+async function loadGallery(){
+  try{ const h = await (await fetch("/api/health")).json();
+       $("verifybtn").textContent = h.unverified > 0 ? `✓ mark reviewed (${h.unverified})` : "✓ all reviewed"; }catch(e){}
+  const a = await (await fetch("/api/assets")).json();
+  $("gallery").innerHTML = a.map(u=>{
+    const rel = decodeURIComponent(u.split("p=")[1]);
+    return `<div style="position:relative"><img src="${u}&t=${Date.now()}" title="${esc(rel)}">
+      <button onclick="editAsset('${esc(rel)}')" title="Edit with AI (governed)" style="position:absolute;top:6px;right:6px;padding:3px 8px;font-size:11px">✏️ AI</button></div>`;
+  }).join("") || '<p class="hint">no assets yet — use Survey Me Now above</p>';
+}
+async function editAsset(rel){
+  const instruction = prompt("Describe the edit (e.g. 'make the sky stormy purple', 'retitle it The Drowned Coast'):");
+  if(!instruction) return;
+  const r = await (await fetch("/api/edit-asset",{method:"POST",body:JSON.stringify({path:rel,instruction})})).json();
+  if(r.error){ alert(r.error); return; }
+  loadGallery(); alert("Edited ✓ saved as " + r.new + " (original kept; new version queued for verification)");
+}
+let SQS = [], CCIDEA = "";
+function ccAdd(cls, text){ $("cclog").insertAdjacentHTML("beforeend", `<div class="msg ${cls}">${esc(text)}</div>`); $("cclog").scrollTop = 1e9; }
+async function ccSend(){
+  const v = $("ccin").value.trim(); if(!v) return; $("ccin").value = "";
+  ccAdd("me", v); ccAdd("ai hint", "thinking…");
+  try{
+    const r = await (await fetch("/api/creative-chat",{method:"POST",body:JSON.stringify({message:v})})).json();
+    $("cclog").lastElementChild.remove();
+    if(r.questions){ CCIDEA = v; renderQs(r); ccAdd("ai", "A few questions so the project fits your idea — answer below and hit Generate."); return; }
+    ccAdd("ai", r.answer || r.error || JSON.stringify(r));
+    if(r.type === "edited"){ loadVision(); loadGallery(); }
+    loadTraces();
+  }catch(e){ $("cclog").lastElementChild.remove(); ccAdd("ai", "request failed: " + e); }
+}
+function renderQs(r){
+  SQS = r.questions;
+  $("s_qs").innerHTML = SQS.map((q,i)=>
+    `<div class="pop-q">${esc(q.q)}</div><input id="sq${i}" placeholder="${esc(q.placeholder||"")}" style="width:100%;margin-bottom:4px">`).join("")
+    + `<button onclick="runSurvey()" style="margin-top:8px">⚒ Generate project (governed)</button>`;
+  $("surveyout").textContent = r.model === "offline" ? "(offline tier: generic KISS intake — connect a model for tailored questions)" : "questions tailored by " + r.model;
+}
+async function runSurvey(){
+  const body = { idea: CCIDEA.replace(/^survey me[:,]? */i, ""),
+    qa: SQS.map((q,i)=>({q: q.q, a: $("sq"+i).value.trim()})) };
+  $("surveyout").textContent = "⚒ generating campaign + governed assets… (local models take a few minutes)";
+  try{
+    const r = await (await fetch("/api/campaign",{method:"POST",body:JSON.stringify(body)})).json();
+    if(r.error){ $("surveyout").textContent = "failed: " + r.error; return; }
+    $("surveyout").textContent = `✓ '${r.title}' — ${r.words} words · ${r.governance.length} asset checks`;
+    $("s_qs").innerHTML = "";
+    ccAdd("ai", `✓ '${r.title}' generated and now active — ${r.words} words, ${r.governance.length} governed asset checks. Ask me about it or tell me what to change.`);
+    ACTIVE = r.active; refresh();
+  }catch(e){ $("surveyout").textContent = "failed: " + e; }
+}
+$("chatin").addEventListener("keydown",e=>{if(e.key==="Enter")send();});
+$("heroin").addEventListener("keydown",e=>{if(e.key==="Enter")heroSend();});
+$("scopein").addEventListener("keydown",e=>{if(e.key==="Enter")scope();});
+$("tracein").addEventListener("keydown",e=>{if(e.key==="Enter")loadTraces();});
+$("memoin").addEventListener("keydown",e=>{if(e.key==="Enter")addMemo();});
+if($("ccin")) $("ccin").addEventListener("keydown",e=>{if(e.key==="Enter")ccSend();});
+async function prefer(i){
+  const c = window.LASTCMP; if(!c) return;
+  const chosen = c.results[i];
+  const rejected = c.results.filter((_,j)=>j!==i).map(x=>({mode:x.mode, answer:x.answer}));
+  const r = await (await fetch("/api/prefer",{method:"POST",body:JSON.stringify({prompt:c.prompt, chosen:{mode:chosen.mode, answer:chosen.answer}, rejected})})).json();
+  alert("👍 saved — preference dataset now has " + r.dataset_pairs + " pair(s) (traces/preferences.jsonl, fine-tuning-ready format)");
+}
+(async()=>{ await safe(status); refresh(); })();
+</script>
+</body>
+</html>

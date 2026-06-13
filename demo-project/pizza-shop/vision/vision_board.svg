@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="640" height="400">
+<defs><linearGradient id="sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#16324f"/><stop offset="1" stop-color="#9bc1bc"/></linearGradient>
+<radialGradient id="sun" cx="0.5" cy="0.4" r="0.6"><stop offset="0" stop-color="#e9a13b" stop-opacity="0.9"/><stop offset="1" stop-color="#e9a13b" stop-opacity="0"/></radialGradient></defs>
+<rect width="640" height="400" fill="url(#sky)"/>
+<ellipse cx="320" cy="120" rx="200" ry="80" fill="url(#sun)"/>
+<text x="320" y="46" font-size="22" font-family="Georgia" letter-spacing="2" fill="#f4ecd8" text-anchor="middle">Pizza Shop Ordering App — Vision Board</text>
+<text x="320" y="70" font-size="13" font-family="Georgia" font-style="italic" fill="#9bc1bc" text-anchor="middle">MVP ordering flow (basic cart → checkout)</text>
+<line x1="0" y1="110" x2="640" y2="110" stroke="#f4ecd8" stroke-width="1" opacity="0.5"/>
+<text x="608" y="104" font-size="10" font-family="Georgia" fill="#f4ecd8" opacity="0.8" text-anchor="end">horizon = deadline</text>
+
+<path d="M0 270 Q120 232 240 256 T480 250 T640 246 V400 H0 Z" fill="#16324f"/>
+<rect x="24" y="142" width="250" height="131" rx="8" fill="#000" opacity="0.25"/>
+<text x="36" y="150" font-size="12" font-family="Georgia" fill="#e9a13b" letter-spacing="2">BUILDING NOW (TIER 1)</text>
+<text x="36" y="170" font-size="12.5" font-family="Georgia" fill="#f4ecd8">◆ Menu display (items, prices, descriptions)</text><text x="36" y="189" font-size="12.5" font-family="Georgia" fill="#f4ecd8">◆ Add to cart functionality</text><text x="36" y="208" font-size="12.5" font-family="Georgia" fill="#f4ecd8">◆ Order submission</text><text x="36" y="227" font-size="12.5" font-family="Georgia" fill="#f4ecd8">◆ Basic payment (Stripe)</text><text x="36" y="246" font-size="12.5" font-family="Georgia" fill="#f4ecd8">◆ Order confirmation email</text>
+
+<path d="M60 386 Q200 350 320 330 T610 296" stroke="#f4ecd8" stroke-width="3" stroke-dasharray="7 6" fill="none" opacity="0.9"/>
+<circle cx="186.92307692307693" cy="365.2307692307692" r="7" fill="#e9a13b"/>
+<text x="36" y="376" font-size="11.5" font-family="Georgia" fill="#f4ecd8">progress: 3 done · 10 open</text>
+<text x="320" y="394" font-size="10" font-family="Georgia" font-style="italic" fill="#9bc1bc" text-anchor="middle">every element maps to project data — shadows = blockers · islands = parked ideas · road = TOD

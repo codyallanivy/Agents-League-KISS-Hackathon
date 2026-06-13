@@ -1,0 +1,15 @@
+{
+  "$schema": "http://adaptivecards.io/schemas/adaptive-card.json",
+  "type": "AdaptiveCard",
+  "version": "1.5",
+  "body": [
+    { "type": "TextBlock", "size": "Medium", "weight": "Bolder", "text": "⚠️ Verification Debt Brake" },
+    { "type": "TextBlock", "text": "${open_items} items are built but unverified (${oldest_age} iterations old). Building more increases risk faster than value.", "wrap": true },
+    { "type": "TextBlock", "text": "KISS rule: at >2 iterations of unverified work, stop new features and run a verification session.", "wrap": true, "isSubtle": true },
+    { "type": "Container", "items": [ { "type": "TextBlock", "text": "${checklist}", "wrap": true } ] }
+  ],
+  "actions": [
+    { "type": "Action.Submit", "title": "Schedule verification session", "data": { "verb": "schedule_verification" } },
+    { "type": "Action.Submit", "title": "Continue anyway (logged)", "data": { "verb": "override_brake" } }
+  ]
+}

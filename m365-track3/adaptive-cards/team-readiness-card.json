@@ -1,0 +1,28 @@
+{
+  "$schema": "http://adaptivecards.io/schemas/adaptive-card.json",
+  "type": "AdaptiveCard",
+  "version": "1.5",
+  "body": [
+    { "type": "TextBlock", "size": "Medium", "weight": "Bolder", "text": "📊 Team Certification Readiness" },
+    { "type": "TextBlock", "text": "${summary}", "wrap": true },
+    { "type": "ColumnSet", "columns": [
+      { "type": "Column", "width": 1, "items": [
+        { "type": "TextBlock", "text": "${ready_count}", "size": "ExtraLarge", "weight": "Bolder", "color": "Good", "horizontalAlignment": "Center" },
+        { "type": "TextBlock", "text": "Exam-ready", "horizontalAlignment": "Center", "isSubtle": true }
+      ]},
+      { "type": "Column", "width": 1, "items": [
+        { "type": "TextBlock", "text": "${studying_count}", "size": "ExtraLarge", "weight": "Bolder", "horizontalAlignment": "Center" },
+        { "type": "TextBlock", "text": "Studying", "horizontalAlignment": "Center", "isSubtle": true }
+      ]},
+      { "type": "Column", "width": 1, "items": [
+        { "type": "TextBlock", "text": "${at_risk_count}", "size": "ExtraLarge", "weight": "Bolder", "color": "Attention", "horizontalAlignment": "Center" },
+        { "type": "TextBlock", "text": "Capacity risk", "horizontalAlignment": "Center", "isSubtle": true }
+      ]}
+    ]},
+    { "type": "TextBlock", "text": "Aggregate view — synthetic learner IDs only. Source: Manager Insights Agent (rule R-2: >20h/week meetings correlates with low completion).", "wrap": true, "isSubtle": true, "size": "Small" }
+  ],
+  "actions": [
+    { "type": "Action.Submit", "title": "Protect focus blocks", "data": { "verb": "protect_focus" } },
+    { "type": "Action.OpenUrl", "title": "Open reasoning trace", "url": "${trace_url}" }
+  ]
+}

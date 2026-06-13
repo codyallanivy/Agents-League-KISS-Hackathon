@@ -22,8 +22,9 @@ class LearningPathCurator(BaseAgent):
         if cur:
             passed.update(cur.get("prerequisites", []))
         target = fabric.next_certification(learner["role"], passed) or cur
-        grounding = self.ctx.foundry_iq.retrieve(
-            f"{target['name']} skills {' '.join(target['skills'])}")
+        grounding = self.ctx.retrieve(
+            f"{target['name']} skills {' '.join(target['skills'])}",
+            scope="shared")
 
         def offline():
             return {

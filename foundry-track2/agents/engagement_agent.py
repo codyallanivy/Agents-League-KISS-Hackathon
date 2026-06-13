@@ -19,7 +19,8 @@ class EngagementAgent(BaseAgent):
         signal = work.signal(learner["learner_id"]) or {}
         window = work.reminder_window(learner["learner_id"])
         at_risk = self.ctx.fabric_iq.at_risk(signal) if signal else False
-        grounding = self.ctx.foundry_iq.retrieve("meeting hours study completion focus time managers")
+        grounding = self.ctx.retrieve("meeting hours study completion focus time managers",
+                                      scope="shared")
 
         def offline():
             nudge = (

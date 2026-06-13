@@ -18,6 +18,16 @@ def is_excluded_source(path: Path) -> bool:
     return False
 
 
+def source_for(path: Path) -> str:
+    """Return a stable citation source with project boundaries preserved."""
+    if path.parent.name == "knowledge":
+        return path.name
+    for p in (path.parent, *path.parents):
+        if (p / "PROJECT_STATE.md").exists():
+            return f"{p.name}/{path.relative_to(p).as_posix()}"
+    return f"{path.parent.name}/{path.name}"
+
+
 class FoundryIQ:
     def __init__(self, source_dirs):
         self.chunks = []  # {source, heading, text}
@@ -32,21 +42,19 @@ class FoundryIQ:
         if is_excluded_source(path):
             return
         text = path.read_text(encoding="utf-8", errors="replace")
-        # source includes the parent folder so projects never blur together
-        self._src = f"{path.parent.name}/{path.name}" if path.parent.name not in ("knowledge",) else path.name
+        source = source_for(path)
         heading = path.name
         buf = []
         for line in text.splitlines():
             if line.startswith("#"):
-                self._flush(path.name, heading, buf)
+                self._flush(source, heading, buf)
                 heading = line.lstrip("# ").strip() or path.name
                 buf = []
             else:
                 buf.append(line)
-        self._flush(path.name, heading, buf)
+        self._flush(source, heading, buf)
 
     def _flush(self, source, heading, buf):
-        source = getattr(self, "_src", source)
         body = "\n".join(buf).strip()
         if body:
             self.chunks.append({"source": source, "heading": heading, "text": body})

@@ -31,7 +31,8 @@ class ManagerInsightsAgent(BaseAgent):
                 "at_risk": at_risk, "score_gap": gap["score_gap"],
                 "hours_gap": gap["hours_gap"],
             })
-        grounding = self.ctx.foundry_iq.retrieve("manager readiness risk meeting hours pass rate")
+        grounding = self.ctx.retrieve("manager readiness risk meeting hours pass rate",
+                                      scope="shared")
 
         def offline():
             risky = [r["learner_id"] for r in rows if r["at_risk"]]

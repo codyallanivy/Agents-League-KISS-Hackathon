@@ -22,7 +22,8 @@ class StudyPlanGenerator(BaseAgent):
         remaining = max(0, cert["recommended_hours"] - learner["hours_studied"])
         weeks = max(1, math.ceil(remaining / capacity)) if remaining else 0
         signal = work.signal(learner["learner_id"]) or {}
-        grounding = self.ctx.foundry_iq.retrieve("recommended study pattern focus hours weekly checkpoints")
+        grounding = self.ctx.retrieve("recommended study pattern focus hours weekly checkpoints",
+                                      scope="shared")
 
         def offline():
             return {

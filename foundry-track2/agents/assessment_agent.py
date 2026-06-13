@@ -24,8 +24,8 @@ class AssessmentAgent(BaseAgent):
     def readiness(self, learner, cert_id):
         cert = self.ctx.fabric_iq.certification(cert_id)
         ready, gap = self.ctx.fabric_iq.exam_ready(learner, cert)
-        grounding = self.ctx.foundry_iq.retrieve(
-            f"{cert['name']} pass threshold practice exam format")
+        grounding = self.ctx.retrieve(
+            f"{cert['name']} pass threshold practice exam format", scope="shared")
 
         def offline():
             questions = [
@@ -60,7 +60,8 @@ class AssessmentAgent(BaseAgent):
     def applied_scope_exam(self, feature_request, project_vision_text):
         tier = self._classify_tier(feature_request, project_vision_text)
         action = self.ctx.fabric_iq.tier_action(tier)
-        grounding = self.ctx.foundry_iq.retrieve("tier classification scope creep park decisions revisit")
+        grounding = self.ctx.retrieve("tier classification scope creep park decisions revisit",
+                                      scope="shared")
 
         def offline():
             verdict = {1: "ACCEPT", 2: "WARN", 3: "BLOCK"}[tier]

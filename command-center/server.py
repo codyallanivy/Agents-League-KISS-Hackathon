@@ -31,6 +31,10 @@ from iq.work_iq import WorkIQ                                         # noqa: E4
 
 T2 = ROOT / "foundry-track2"
 FANTASY_TEMPLATE = ROOT / "creative-track1" / "fantasy-template"
+SHARED_KNOWLEDGE_DOCS = {
+    "kiss_certification_guide.md",
+    "context_health_policy.md",
+}
 LEGACY_FANTASY_MARKERS = (
     "current snapshot of the campaign build",
     "playable 3-session campaign",
@@ -90,6 +94,18 @@ def fantasy_hit(hit: dict) -> bool:
         return True
     body = f"{c}\n{hit.get('snippet', '')}".lower()
     return "campaign.md" in c and any(marker in body for marker in LEGACY_FANTASY_MARKERS)
+
+
+def hit_source(hit: dict) -> str:
+    return (hit.get("citation") or "").split(" § ", 1)[0]
+
+
+def shared_hit(hit: dict) -> bool:
+    return hit_source(hit) in SHARED_KNOWLEDGE_DOCS
+
+
+def active_project_hit(hit: dict) -> bool:
+    return hit_source(hit).startswith(ACTIVE + "/")
 
 
 def safe_index_project(d: Path):
@@ -363,24 +379,48 @@ def traces(q=""):
     return steps[-30:][::-1]
 
 
-def retrieve_for_mode(query, mode="project", top_k=4):
-    """Project-aware retrieval: keep one project's memory from contaminating
-    another project's reasoning. Always allows the ACTIVE project's own files
-    plus shared KISS method knowledge; other projects never bleed in. (Citations
-    from FoundryIQ are prefixed with the project folder, so the ACTIVE + "/" gate
-    is exact.) This is what stops, e.g., creative content surfacing inside an
-    unrelated project's planning answers."""
-    results = [g for g in CTX.foundry_iq.retrieve(query, top_k=25)
+def retrieve_iq(query, scope="project", top_k=4, pool=25):
+    """Scoped retrieval over the shared IQ index.
+
+    The model tier can be Foundry, Ollama, or offline, but this function decides
+    what memory the model is allowed to see:
+      - shared: KISS method docs only
+      - project: active project files + shared method docs
+      - active: active project files only
+      - global: all non-excluded chunks, for explicit cross-project work
+    """
+    results = [g for g in CTX.foundry_iq.retrieve(query, top_k=pool)
                if not fantasy_hit(g)]
-    if mode == "global":
+    if scope == "global":
         return results[:top_k]
-    core = ["kiss_certification_guide.md", "context_health_policy.md"]
-    allowed = [ACTIVE + "/"] + core
-    filtered = [g for g in results if any(a in g.get("citation", "") for a in allowed)]
+    if scope == "shared":
+        filtered = [g for g in results if shared_hit(g)]
+    elif scope == "active":
+        filtered = [g for g in results if active_project_hit(g)]
+    else:
+        filtered = [g for g in results if active_project_hit(g) or shared_hit(g)]
     # No global fallback: if nothing in the ACTIVE project (or shared method docs)
     # matches, return nothing rather than leaking another project's memory into
     # the answer. This is what kept unrelated questions reaching for other projects.
     return filtered[:top_k]
+
+
+def retrieve_for_mode(query, mode="project", top_k=4):
+    scope = "global" if mode == "global" else "project"
+    return retrieve_iq(query, scope=scope, top_k=top_k)
+
+
+def shared_method_refs(query, top_k=3):
+    hits = retrieve_iq(query, scope="shared", top_k=top_k, pool=25)
+    if hits:
+        return hits
+    # If the user's idea has no keyword overlap with method docs, still ground
+    # generation in KISS process knowledge, not in another project's content.
+    return retrieve_iq("scope tier risk verification project", scope="shared",
+                       top_k=top_k, pool=25)
+
+
+CTX.retrieve_iq = retrieve_iq
 
 
 def chat(message, file_context="", mode="project"):
@@ -930,10 +970,10 @@ class H(BaseHTTPRequestHandler):
             title = ist.scaffold_project(a, out)
 
             # --- REFERENCE GROUNDING (search before generating) -----------------
-            # 1) the project's own intake signal; 2) related approved knowledge.
+            # New projects are grounded only in intake answers + shared KISS method
+            # docs. Other project files never seed a fresh project's content.
             qa_lines = "\n".join(f"Q: {x.get('q','')}\nA: {x.get('a','')}" for x in qa if x.get("a"))
-            kb_hits = [h for h in CTX.foundry_iq.retrieve(idea, top_k=20)
-                       if not fantasy_hit(h)][:3]
+            kb_hits = shared_method_refs(idea, top_k=3)
             kb_refs = "\n".join(f"[{h['citation']}] {h['snippet'][:200]}" for h in kb_hits)
             references = (f"INTAKE ANSWERS:\n{qa_lines or '- (none)'}\n\n"
                           f"MUST-HAVE (Tier 1): {a['must_have']}\n"

@@ -125,6 +125,18 @@ class AgentContext:
         self.model = model or ModelClient()
         self.tracer = tracer or TraceLogger()
 
+    def retrieve(self, query: str, scope: str = "shared", top_k: int = 4):
+        """Retrieve through a host-provided scope guard when available.
+
+        Command Center installs `retrieve_iq` so older agents cannot accidentally
+        pass another project's chunks to the active model tier. Standalone demos
+        fall back to the raw local IQ index.
+        """
+        guarded = getattr(self, "retrieve_iq", None)
+        if callable(guarded):
+            return guarded(query, scope=scope, top_k=top_k)
+        return self.foundry_iq.retrieve(query, top_k=top_k)
+
 
 class BaseAgent:
     name = "BaseAgent"

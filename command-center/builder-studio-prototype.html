@@ -1114,6 +1114,28 @@
     line-height: 1.45;
   }
 
+  .workflow-help-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .workflow-help-card {
+    border: 1px solid var(--edge-soft);
+    border-radius: 6px;
+    padding: 8px;
+    background: #0f0d0a;
+    color: var(--muted);
+    font-size: 11px;
+    line-height: 1.45;
+  }
+
+  .workflow-help-card b {
+    display: block;
+    color: var(--ink);
+    margin-bottom: 4px;
+  }
+
   .quick-toolbar {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1423,20 +1445,25 @@
     position: fixed;
     right: 16px;
     bottom: 16px;
-    width: min(360px, calc(100vw - 32px));
+    width: min(220px, calc(100vw - 32px));
     z-index: 50;
     border: 1px solid rgba(244, 185, 78, 0.72);
-    border-radius: 10px;
+    border-radius: 999px;
     background: rgba(14, 18, 28, 0.96);
     color: #d7e0ee;
     box-shadow: 0 16px 34px rgba(0, 0, 0, 0.48);
     overflow: hidden;
   }
 
+  .kiss-iq-dock.open {
+    width: min(360px, calc(100vw - 32px));
+    border-radius: 10px;
+  }
+
   .kiss-iq-head {
     width: 100%;
     border: 0;
-    border-radius: 0;
+    border-radius: inherit;
     background: transparent;
     color: var(--gold);
     padding: 10px 12px;
@@ -1444,6 +1471,9 @@
     font-size: 11px;
     letter-spacing: 1.6px;
     text-transform: uppercase;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .kiss-iq-body {
@@ -1550,6 +1580,7 @@
   }
 
   .preview-only-mode .planner,
+  .preview-only-mode .inspector,
   .preview-only-mode .terminal,
   .preview-only-mode .tool-shelf,
   .preview-only-mode .level-strip,
@@ -1559,23 +1590,13 @@
   }
 
   .preview-only-mode .shell {
-    grid-template-columns: minmax(0, 1fr) minmax(280px, var(--inspector-width, 330px));
+    grid-template-columns: minmax(0, 1fr);
     grid-template-rows: minmax(0, 1fr);
   }
 
   .preview-only-mode .workspace {
-    grid-column: 1;
+    grid-column: 1 / -1;
     grid-row: 1;
-  }
-
-  .preview-only-mode .inspector {
-    display: block;
-    grid-column: 2;
-    grid-row: 1;
-  }
-
-  .preview-only-mode.inspector-collapsed .shell {
-    grid-template-columns: minmax(0, 1fr) 74px;
   }
 
   .preview-only-mode .stage {
@@ -1640,8 +1661,7 @@
     }
 
     .preview-only-mode .inspector {
-      grid-column: 1;
-      grid-row: auto;
+      display: none;
     }
   }
 
@@ -1989,7 +2009,7 @@
 </main>
 
 <section id="kissIqDock" class="kiss-iq-dock" aria-label="KISS IQ Azure guidance">
-  <button class="kiss-iq-head" type="button" onclick="toggleKissIqDock()">KISS IQ - connecting...</button>
+  <button class="kiss-iq-head" type="button" onclick="toggleKissIqDock()" title="KISS IQ - click to open or minimize">KISS IQ - connecting...</button>
   <div class="kiss-iq-body">
     <div id="kissIqStatus" class="hint">Foundry IQ guidance, Fabric IQ scope validation, and project-context chat.</div>
     <textarea id="kissIqInput" placeholder="Ask for cited guidance or describe a feature to validate..."></textarea>
@@ -1997,6 +2017,7 @@
       <button class="small primary" onclick="runKissIqScope()">Validate Scope</button>
       <button class="small" onclick="runKissIqGuide()">Cited Guidance</button>
       <button class="small" onclick="prefillKissIqFromBuild()">Use Current Build</button>
+      <button class="small" onclick="toggleKissIqDock(false)">Minimize</button>
     </div>
     <div id="kissIqOutput" class="kiss-iq-output">Start the Command Center engine to connect Azure/Foundry-backed IQ. Offline mode still keeps the local builder working.</div>
   </div>
@@ -2309,7 +2330,6 @@ function createInitialState() {
     selectedComponentId: null,
     codeDraft: "",
     codeDirty: false,
-    canvasAssistantLast: "",
     audit: [],
     terminal: {
       cwd: "/",
@@ -3466,6 +3486,91 @@ function renderCanvasInspectorStatus() {
   if (badge) badge.textContent = selected ? selected.name : "none";
 }
 
+function styleFontOptions() {
+  return [
+    ["Inter, Aptos, Segoe UI, Arial, sans-serif", "Clean app font"],
+    ["Georgia, Times New Roman, serif", "Editorial serif"],
+    ["Trebuchet MS, Segoe UI, sans-serif", "Friendly rounded"],
+    ["Cascadia Code, Consolas, monospace", "Code / terminal"]
+  ];
+}
+
+function renderPageStyleControls(idPrefix = "style") {
+  const fontOptions = styleFontOptions();
+  return `
+    <div class="component-style-panel wide">
+      <div class="editor-section-title">
+        <h3>Page Style</h3>
+        <span class="badge gold">global</span>
+      </div>
+      <p class="quick-help">These controls change the page or app you are building. Selected Block Style below changes one component at a time.</p>
+      <div class="style-grid">
+        <div class="wide">
+          <label class="field-toggle">
+            <input id="${idPrefix}UniformStyleToggle" type="checkbox" ${state.uniformComponentStyle ? "checked" : ""} onchange="setUniformComponentStyle(this.checked)">
+            Keep cards and buttons uniform
+          </label>
+        </div>
+        <div class="wide">
+          <label for="${idPrefix}Font">Font</label>
+          <select id="${idPrefix}Font" onchange="updateStyle('font', this.value)">
+            ${fontOptions.map(([value, label]) => `<option value="${esc(value)}" ${state.styles.font === value ? "selected" : ""}>${esc(label)}</option>`).join("")}
+          </select>
+        </div>
+        <div>
+          <label for="${idPrefix}Bg">Page</label>
+          <input id="${idPrefix}Bg" type="color" value="${esc(state.styles.pageBg)}" oninput="updateStyle('pageBg', this.value)">
+        </div>
+        <div>
+          <label for="${idPrefix}Text">Text</label>
+          <input id="${idPrefix}Text" type="color" value="${esc(state.styles.text)}" oninput="updateStyle('text', this.value)">
+        </div>
+        <div>
+          <label for="${idPrefix}Panel">Cards</label>
+          <input id="${idPrefix}Panel" type="color" value="${esc(state.styles.panel)}" oninput="updateStyle('panel', this.value)">
+        </div>
+        <div>
+          <label for="${idPrefix}Border">Borders</label>
+          <input id="${idPrefix}Border" type="color" value="${esc(state.styles.border)}" oninput="updateStyle('border', this.value)">
+        </div>
+        <div>
+          <label for="${idPrefix}Accent">Button</label>
+          <input id="${idPrefix}Accent" type="color" value="${esc(state.styles.accent)}" oninput="updateStyle('accent', this.value)">
+        </div>
+        <div>
+          <label for="${idPrefix}ButtonText">Button text</label>
+          <input id="${idPrefix}ButtonText" type="color" value="${esc(state.styles.buttonText)}" oninput="updateStyle('buttonText', this.value)">
+        </div>
+      </div>
+    </div>`;
+}
+
+function renderWorkflowHelp() {
+  return `
+    <div class="workflow-help-grid">
+      <div class="workflow-help-card">
+        <b>Beginner path</b>
+        1. Page Style sets the whole app. 2. Select a block. 3. Selected Block Style customizes only that block. 4. Add behavior, then test.
+      </div>
+      <div class="workflow-help-card">
+        <b>Pro shortcuts</b>
+        Use Fit and Focus Selected for CAD-like navigation. Use Code mode for HTML/CSS edits, then return to Build for supported visual edits.
+      </div>
+    </div>`;
+}
+
+function renderTerminalBridge() {
+  return `
+    <div class="canvas-inspector-note">
+      <b>Need help or a command?</b><br>
+      The AI assistant lives in the full AI Chat + Smart Terminal so there is one conversation history.
+      <div class="flow-actions" style="margin-top:8px">
+        <button class="small primary" onclick="openSmartTerminal()">Open AI Chat</button>
+        <button class="small" onclick="openSmartTerminal('How do I change page color?')">Ask about colors</button>
+      </div>
+    </div>`;
+}
+
 function canvasPropControls(selected) {
   return Object.entries(selected.props).map(([key, value]) => {
     const val = typeof value === "object" ? JSON.stringify(value) : String(value);
@@ -3492,12 +3597,14 @@ function renderCanvasInspector() {
         <button class="small primary" onclick="selectFirstComponent()">Select first block</button>
         <button class="small" onclick="applyRecommendedTemplate()">Apply starter</button>
         <button class="small" onclick="fitViewport()">Fit canvas</button>
-        <button class="small" onclick="togglePanel('terminal')">Open AI Chat</button>
+        <button class="small" onclick="openSmartTerminal()">Open AI Chat</button>
       </div>
+      ${renderPageStyleControls("canvasPage")}
       <div class="summary">
         <span class="${foundryClass}">${foundryLabel}</span><br>
         Ask questions in AI Chat or turn on KISS IQ only when you want engine-backed guidance.
-      </div>`;
+      </div>
+      ${renderWorkflowHelp()}`;
     return;
   }
   const customActive = !state.uniformComponentStyle && selected.styles && selected.styles.useGlobal === false;
@@ -3516,81 +3623,17 @@ function renderCanvasInspector() {
     <div class="prop-grid">
       ${canvasPropControls(selected)}
     </div>
+    ${renderPageStyleControls("canvasPage")}
     ${renderSelectedStyleControls(selected, "canvasComponent")}
     ${renderInteractionEditor(selected)}
-    <div class="interaction-editor">
-      <div class="editor-section-title">
-        <h3>Ask AI / Smart Terminal</h3>
-        <span class="${foundryClass}">${foundryLabel}</span>
-      </div>
-      <p class="hint">This asks the local Tutor Agent first. KISS IQ is used only when the top KISS IQ switch is on.</p>
-      <input id="canvasAssistantInput" placeholder="Ask: how do I change this card color?">
-      <div class="flow-actions">
-        <button class="small primary" onclick="askCanvasAssistant()">Ask</button>
-        <button class="small" onclick="setFoundry(!state.foundryEnabled)">${state.foundryEnabled ? "Turn KISS IQ off" : "Turn KISS IQ on"}</button>
-        <button class="small" onclick="togglePanel('terminal')">Show full chat</button>
-      </div>
-      <div class="hint" id="canvasAssistantAnswer">${esc(state.canvasAssistantLast || "No question yet.")}</div>
-    </div>`;
-}
-
-function askCanvasAssistant() {
-  const input = $("canvasAssistantInput");
-  const value = input?.value.trim();
-  if (!value) return;
-  const record = assistantAnswer(value);
-  state.canvasAssistantLast = record.resultText;
-  addTerminalRecord(record);
-  renderCanvasInspector();
+    ${renderTerminalBridge()}
+    ${renderWorkflowHelp()}`;
 }
 
 function renderStyleControls() {
   const box = $("styleControls");
   if (!box) return;
-  const fontOptions = [
-    ["Inter, Aptos, Segoe UI, Arial, sans-serif", "Clean app font"],
-    ["Georgia, Times New Roman, serif", "Editorial serif"],
-    ["Trebuchet MS, Segoe UI, sans-serif", "Friendly rounded"],
-    ["Cascadia Code, Consolas, monospace", "Code / terminal"]
-  ];
-  box.innerHTML = `
-    <div class="wide">
-      <label class="field-toggle">
-        <input id="uniformStyleToggle" type="checkbox" ${state.uniformComponentStyle ? "checked" : ""} onchange="setUniformComponentStyle(this.checked)">
-        Keep cards and buttons uniform
-      </label>
-      <p class="hint">Turn this off to style the selected card, panel, or button individually in the Inspector.</p>
-    </div>
-    <div class="wide">
-      <label for="styleFont">Font</label>
-      <select id="styleFont" onchange="updateStyle('font', this.value)">
-        ${fontOptions.map(([value, label]) => `<option value="${esc(value)}" ${state.styles.font === value ? "selected" : ""}>${esc(label)}</option>`).join("")}
-      </select>
-    </div>
-    <div>
-      <label for="styleBg">Page</label>
-      <input id="styleBg" type="color" value="${esc(state.styles.pageBg)}" oninput="updateStyle('pageBg', this.value)">
-    </div>
-    <div>
-      <label for="styleText">Text</label>
-      <input id="styleText" type="color" value="${esc(state.styles.text)}" oninput="updateStyle('text', this.value)">
-    </div>
-    <div>
-      <label for="stylePanel">Cards</label>
-      <input id="stylePanel" type="color" value="${esc(state.styles.panel)}" oninput="updateStyle('panel', this.value)">
-    </div>
-    <div>
-      <label for="styleBorder">Borders</label>
-      <input id="styleBorder" type="color" value="${esc(state.styles.border)}" oninput="updateStyle('border', this.value)">
-    </div>
-    <div>
-      <label for="styleAccent">Button</label>
-      <input id="styleAccent" type="color" value="${esc(state.styles.accent)}" oninput="updateStyle('accent', this.value)">
-    </div>
-    <div>
-      <label for="styleButtonText">Button text</label>
-      <input id="styleButtonText" type="color" value="${esc(state.styles.buttonText)}" oninput="updateStyle('buttonText', this.value)">
-    </div>`;
+  box.innerHTML = renderPageStyleControls("style");
 }
 
 function renderAiGuide() {
@@ -3748,13 +3791,19 @@ async function bootKissIq() {
   try {
     const result = await kissIqApi("/api/status");
     window.KISS_IQ_ON = true;
-    if (head) head.textContent = `KISS IQ - ${String(result.model || "engine").toUpperCase()} - ${result.active || "project"}`;
+    if (head) {
+      head.textContent = `KISS IQ - ${String(result.model || "engine").toUpperCase()} - ${result.active || "project"}`;
+      head.title = head.textContent;
+    }
     if (status) status.textContent = "Connected: Foundry IQ guidance, Fabric IQ scope validation, and project-context chat are available.";
     renderFoundryGuide();
     return result;
   } catch {
     window.KISS_IQ_ON = false;
-    if (head) head.textContent = "KISS IQ - engine offline";
+    if (head) {
+      head.textContent = "KISS IQ - engine offline";
+      head.title = head.textContent;
+    }
     if (status) status.textContent = "Run start.bat option 6 to connect the Command Center engine. The visual builder still works offline.";
     renderFoundryGuide();
     return null;
@@ -4616,6 +4665,20 @@ function renderTerminal() {
 function fillTerminal(command) {
   $("termInput").value = command;
   $("termInput").focus();
+}
+
+function openSmartTerminal(prompt = "") {
+  if (!state.panels) state.panels = createInitialState().panels;
+  state.previewOnlyMode = false;
+  state.panels.terminal = false;
+  saveState();
+  render();
+  setTimeout(() => {
+    const input = $("termInput");
+    if (!input) return;
+    if (prompt) input.value = prompt;
+    input.focus();
+  }, 0);
 }
 
 function resetPrototype() {

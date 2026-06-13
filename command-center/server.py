@@ -398,7 +398,9 @@ def retrieve_iq(query, scope="project", top_k=4, pool=25):
     elif scope == "active":
         filtered = [g for g in results if active_project_hit(g)]
     else:
-        filtered = [g for g in results if active_project_hit(g) or shared_hit(g)]
+        active = [g for g in results if active_project_hit(g)]
+        shared = [g for g in results if shared_hit(g)]
+        filtered = active + shared
     # No global fallback: if nothing in the ACTIVE project (or shared method docs)
     # matches, return nothing rather than leaking another project's memory into
     # the answer. This is what kept unrelated questions reaching for other projects.
@@ -420,6 +422,25 @@ def shared_method_refs(query, top_k=3):
                        top_k=top_k, pool=25)
 
 
+def app_status_question(message: str) -> bool:
+    msg = (message or "").lower()
+    return any(term in msg for term in (
+        "foundry", "model", "connected", "connection", "token", "tokens",
+        "offline", "ollama", "azure",
+    ))
+
+
+def app_status_context() -> str:
+    foundry_on = CTX.model.mode.startswith("foundry:")
+    return (
+        "CURRENT APP STATUS:\n"
+        f"- Active model tier: {CTX.model.mode}\n"
+        f"- Microsoft Foundry/Azure model tier: {'ON' if foundry_on else 'OFF'}\n"
+        f"- Active project: {ACTIVE}\n"
+        "- In this app, 'Foundry' means the Microsoft/Azure model tier, not Foundry VTT."
+    )
+
+
 CTX.retrieve_iq = retrieve_iq
 
 
@@ -432,6 +453,8 @@ def chat(message, file_context="", mode="project"):
         grounding = [{"citation": f"{ACTIVE} project files (live)",
                       "snippet": file_context[:1200]}] + own[:3]
     if mode == "assistant":
+        if app_status_question(message):
+            grounding = []
         # A real general assistant: answer ANY question from the model's own
         # knowledge. Project notes are optional context, attached only when they
         # actually match the active project — never forced into unrelated answers,
@@ -441,10 +464,12 @@ def chat(message, file_context="", mode="project"):
                   "Optional project notes may appear below; use them ONLY if the "
                   "question is clearly about the user's active project, otherwise "
                   "ignore them entirely and just answer normally. Never pad an "
-                  "unrelated answer with project references. Be concise and warm.")
+                  "unrelated answer with project references. Use CURRENT APP STATUS "
+                  "for questions about model connection, tokens, Foundry, Ollama, "
+                  "or offline mode. Be concise and warm.")
         notes = ("\n\n".join(f"[{g['citation']}]\n{g['snippet']}" for g in grounding)
                  or "(no project notes apply — answer from general knowledge)")
-        raw = CTX.model.complete(system, f"QUESTION: {message}\n\nOPTIONAL PROJECT NOTES:\n{notes}")
+        raw = CTX.model.complete(system, f"{app_status_context()}\n\nQUESTION: {message}\n\nOPTIONAL PROJECT NOTES:\n{notes}")
         if raw is None:
             raw = ("(offline tier) General questions need a model tier — switch on "
                    "Foundry or Ollama in the top bar. I can still answer questions "
@@ -455,8 +480,10 @@ def chat(message, file_context="", mode="project"):
                        output={"answer": raw}, extra={"project": ACTIVE})
         # only surface citations when project notes were actually relevant/used
         return {"answer": raw, "cites": [g["citation"] for g in grounding][:3]}
-    system = ("You are the KISS Agile coach. Answer from the cited project knowledge; "
-              "protect scope; be concise and warm. Cite sources in [brackets].")
+    system = ("You are the KISS Agile coach. Answer from the active project's cited "
+              "files first. Use shared KISS method docs only as process support, not "
+              "as the project identity. Protect scope; be concise and warm. Cite "
+              "sources in [brackets].")
     cites = "\n\n".join(f"[{g['citation']}]\n{g['snippet']}" for g in grounding) or "(none)"
     raw = CTX.model.complete(system, f"QUESTION: {message}\n\nKNOWLEDGE:\n{cites}")
     if raw is None:

@@ -81,14 +81,21 @@ class AssessmentAgent(BaseAgent):
                 ),
             }
 
-        return self.execute(
+        baseline = offline()
+        result = self.execute(
             task=f"Applied exam: classify '{feature_request}' against the project vision "
                  f"and choose ACCEPT/WARN/BLOCK with the correct KISS action.\n\n"
+                 f"Deterministic KISS classifier result: Tier {tier}, "
+                 f"verdict {baseline['verdict']}, action {action}. Use this "
+                 "classification unless the cited project vision clearly proves it wrong.\n\n"
                  f"PRODUCT_VISION excerpt:\n{project_vision_text[:600]}",
             grounding=grounding,
             offline_fn=offline,
             extra={"feature_request": feature_request, "tier": tier},
         )
+        for key in ("verdict", "tier", "action", "decision_entry"):
+            result.setdefault(key, baseline.get(key))
+        return result
 
     # --- helpers --------------------------------------------------------------
     def _classify_tier(self, request, vision_text):
